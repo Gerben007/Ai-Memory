@@ -18,9 +18,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-# Copy built frontend and server
+# Copy built frontend, server, and MCP server
 COPY --from=build /app/dist ./dist
 COPY server ./server
+COPY mcp-server.js ./mcp-server.js
 
 # Copy seed notes (used as defaults if vault is empty)
 COPY vault ./vault-seed

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
+import { createSearchRoutes } from './searchRoutes.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -24,6 +25,7 @@ app.use(express.text())
 // API routes
 app.use('/api/notes', createFileRoutes(VAULT_DIR))
 app.use('/api/chat', createAnthropicProxy())
+app.use('/api', createSearchRoutes(VAULT_DIR))
 
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {

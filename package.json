@@ -7,9 +7,11 @@
     "dev": "concurrently \"vite\" \"nodemon server/index.js\"",
     "build": "vite build",
     "start": "NODE_ENV=production node server/index.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "mcp": "node mcp-server.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "gray-matter": "^4.0.3",
