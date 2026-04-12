@@ -1,6 +1,24 @@
 import { useState } from 'react'
 import { useStore } from '../lib/store'
 
+const TAG_PALETTE = [
+  '#818cf8', '#f472b6', '#34d399', '#fbbf24', '#60a5fa',
+  '#a78bfa', '#fb923c', '#2dd4bf', '#f87171', '#a3e635'
+]
+
+function hashCode(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function getTagColor(tag) {
+  return TAG_PALETTE[hashCode(tag) % TAG_PALETTE.length]
+}
+
 const NAV_ITEMS = [
   { key: 'editor', label: 'Notes', icon: '📝' },
   { key: 'chat', label: 'AI Chat', icon: '💬' },
@@ -50,6 +68,7 @@ export default function Sidebar() {
       {/* Header */}
       <div className="p-4 border-b border-gray-800">
         <h1 className="text-lg font-bold text-indigo-400">Knowledge Vault</h1>
+        <p className="text-[10px] text-gray-500 mt-0.5">{notes.length} notes</p>
       </div>
 
       {/* Search */}
@@ -120,11 +139,12 @@ export default function Sidebar() {
                 {note.frontmatter?.title || note.filename.replace(/\.md$/, '')}
               </div>
               {note.frontmatter?.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="flex flex-wrap gap-1 mt-1.5">
                   {note.frontmatter.tags.map(tag => (
                     <span
                       key={tag}
-                      className="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded"
+                      className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}
                     >
                       {tag}
                     </span>
