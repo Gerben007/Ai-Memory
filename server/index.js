@@ -9,7 +9,8 @@ import { createAnthropicProxy } from './anthropicProxy.js'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3001
-const VAULT_DIR = path.join(__dirname, '..', 'vault')
+const HOST = process.env.HOST || '0.0.0.0'
+const VAULT_DIR = process.env.VAULT_DIR || path.join(__dirname, '..', 'vault')
 
 // Ensure vault directory exists
 if (!fs.existsSync(VAULT_DIR)) {
@@ -33,7 +34,7 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-app.listen(PORT, () => {
-  console.log(`Knowledge Vault server running on http://localhost:${PORT}`)
+app.listen(PORT, HOST, () => {
+  console.log(`Knowledge Vault server running on http://${HOST}:${PORT}`)
   console.log(`Vault directory: ${VAULT_DIR}`)
 })

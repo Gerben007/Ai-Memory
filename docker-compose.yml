@@ -1,0 +1,17 @@
+services:
+  knowledge-vault:
+    build: .
+    container_name: knowledge-vault
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - vault-data:/data/vault
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - VAULT_DIR=/data/vault
+
+volumes:
+  vault-data:
+    driver: local
