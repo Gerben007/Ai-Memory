@@ -138,15 +138,15 @@ export default function ChatPanel() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b border-gray-800 p-4 bg-gray-900/50">
-        <h2 className="text-lg font-bold text-gray-200">AI Chat</h2>
-        <p className="text-xs text-gray-500 mt-1">
-          Ask questions about your vault. AI uses RAG to find relevant notes.
+      <div className="border-b border-gray-800 px-3 py-2 md:p-4 bg-gray-900/50">
+        <h2 className="text-sm md:text-lg font-bold text-gray-200">AI Chat</h2>
+        <p className="text-[10px] md:text-xs text-gray-500 mt-0.5">
+          Ask questions about your vault
         </p>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {chatMessages.length === 0 && (
           <div className="text-center text-gray-500 mt-20">
             <div className="text-4xl mb-4">💬</div>
@@ -163,7 +163,7 @@ export default function ChatPanel() {
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-xl px-4 py-3 ${
+              className={`max-w-[90%] md:max-w-[80%] rounded-xl px-3 py-2 md:px-4 md:py-3 ${
                 msg.role === 'user'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-gray-800 text-gray-200'
@@ -187,7 +187,7 @@ export default function ChatPanel() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-800 p-4 bg-gray-900/50">
+      <div className="border-t border-gray-800 p-3 md:p-4 bg-gray-900/50">
         {!apiKey && (
           <div className="mb-2 text-xs text-amber-400 flex items-center gap-2">
             <span>API key not set.</span>
