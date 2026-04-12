@@ -1,7 +1,14 @@
+# Portainer Web Editor stack — paste this into Portainer > Stacks > Add Stack > Web editor
+# Prerequisites: SSH into your homelab first and build the image:
+#   git clone git@github.com:Gerben007/Ai-Memory.git
+#   cd Ai-Memory
+#   docker build -t knowledge-vault:latest .
+#
+# Then paste this stack definition in Portainer.
+
 services:
   knowledge-vault:
     image: knowledge-vault:latest
-    build: .
     container_name: knowledge-vault
     restart: unless-stopped
     ports:
