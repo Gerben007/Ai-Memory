@@ -17,6 +17,7 @@ export default function Editor() {
   const [tags, setTags] = useState('')
   const [showPreview, setShowPreview] = useState(true)
   const [saveStatus, setSaveStatus] = useState('')
+  const [dirty, setDirty] = useState(false)
   const previewRef = useRef(null)
 
   // Load note content when active note changes
@@ -25,6 +26,8 @@ export default function Editor() {
       setBody(activeNote.body || '')
       setTitle(activeNote.frontmatter?.title || activeNote.filename.replace(/\.md$/, ''))
       setTags((activeNote.frontmatter?.tags || []).join(', '))
+      setDirty(false)
+      setSaveStatus('')
     }
   }, [activeNoteFilename]) // intentionally only depend on filename
 
@@ -44,40 +47,65 @@ export default function Editor() {
     return matter.stringify(bodyText, frontmatter)
   }, [activeNote])
 
+  // Manual save
+  const handleManualSave = useCallback(async () => {
+    if (!activeNoteFilename) return
+    const content = buildContent(body, title, tags)
+    await saveNote(activeNoteFilename, content)
+    setSaveStatus('Saved')
+    setDirty(false)
+    setTimeout(() => setSaveStatus(''), 2000)
+  }, [activeNoteFilename, body, title, tags, buildContent, saveNote])
+
   // Auto-save
   const doSave = useCallback(async (bodyText, titleText, tagsText) => {
     if (!activeNoteFilename) return
     const content = buildContent(bodyText, titleText, tagsText)
     await saveNote(activeNoteFilename, content)
     setSaveStatus('Saved')
+    setDirty(false)
     setTimeout(() => setSaveStatus(''), 2000)
   }, [activeNoteFilename, buildContent, saveNote])
 
   const { triggerSave } = useAutoSave(doSave)
 
   const handleBodyChange = (e) => {
-    const newBody = e.target.value
-    setBody(newBody)
-    triggerSave(newBody, title, tags)
+    const val = e.target.value
+    setBody(val)
+    setDirty(true)
+    triggerSave(val, title, tags)
   }
 
   const handleTitleChange = (e) => {
-    const newTitle = e.target.value
-    setTitle(newTitle)
-    triggerSave(body, newTitle, tags)
+    const val = e.target.value
+    setTitle(val)
+    setDirty(true)
+    triggerSave(body, val, tags)
   }
 
   const handleTagsChange = (e) => {
-    const newTags = e.target.value
-    setTags(newTags)
-    triggerSave(body, title, newTags)
+    const val = e.target.value
+    setTags(val)
+    setDirty(true)
+    triggerSave(body, title, val)
   }
+
+  // Ctrl+S / Cmd+S to save
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleManualSave()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleManualSave])
 
   // Handle wikilink clicks in preview
   useEffect(() => {
     const preview = previewRef.current
     if (!preview) return
-
     const handleClick = (e) => {
       const link = e.target.closest('.wikilink')
       if (link) {
@@ -88,12 +116,9 @@ export default function Editor() {
           const noteName = n.filename.replace(/\.md$/, '').toLowerCase()
           return noteTitle === target.toLowerCase() || noteName === target.toLowerCase()
         })
-        if (targetNote) {
-          setActiveNote(targetNote.filename)
-        }
+        if (targetNote) setActiveNote(targetNote.filename)
       }
     }
-
     preview.addEventListener('click', handleClick)
     return () => preview.removeEventListener('click', handleClick)
   }, [notes, setActiveNote])
@@ -102,8 +127,8 @@ export default function Editor() {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
         <div className="text-center">
-          <div className="text-4xl mb-4">📝</div>
-          <p>Select a note or create a new one</p>
+          <div className="text-5xl mb-4 opacity-30">📝</div>
+          <p className="text-sm">Select a note or create a new one</p>
         </div>
       </div>
     )
@@ -113,73 +138,74 @@ export default function Editor() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Metadata bar */}
-      <div className="border-b border-gray-800 p-4 bg-gray-900/50">
-        <div className="flex items-center gap-4">
+      {/* Toolbar */}
+      <div className="border-b border-gray-800 px-5 py-3 bg-gray-900/50">
+        <div className="flex items-center gap-3">
           <input
             type="text"
             value={title}
             onChange={handleTitleChange}
-            className="flex-1 bg-transparent text-xl font-bold text-gray-100 focus:outline-none border-b border-transparent focus:border-indigo-500 pb-1"
+            className="flex-1 bg-transparent text-lg font-semibold text-gray-100 focus:outline-none border-b border-transparent focus:border-indigo-500 pb-0.5"
             placeholder="Note title"
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {saveStatus && (
-              <span className="text-xs text-green-400 animate-pulse">{saveStatus}</span>
+              <span className="text-xs text-green-400">{saveStatus}</span>
+            )}
+            {dirty && !saveStatus && (
+              <span className="text-xs text-amber-400">Unsaved</span>
             )}
             <button
+              onClick={handleManualSave}
+              className="text-xs bg-indigo-600 text-white px-4 py-1.5 rounded-lg hover:bg-indigo-500 font-medium"
+            >
+              Save
+            </button>
+            <button
               onClick={() => setShowPreview(!showPreview)}
-              className={`text-sm px-3 py-1 rounded-lg ${
+              className={`text-xs px-3 py-1.5 rounded-lg border ${
                 showPreview
-                  ? 'bg-indigo-600/20 text-indigo-400'
-                  : 'text-gray-500 hover:text-gray-300'
+                  ? 'bg-gray-800 border-gray-600 text-gray-300'
+                  : 'border-gray-700 text-gray-500 hover:text-gray-300'
               }`}
             >
               Preview
             </button>
           </div>
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="text-xs text-gray-500">Tags:</span>
-          <input
-            type="text"
-            value={tags}
-            onChange={handleTagsChange}
-            className="flex-1 bg-transparent text-sm text-gray-300 focus:outline-none placeholder-gray-600"
-            placeholder="tag1, tag2, tag3"
-          />
-        </div>
-        {activeNote.frontmatter?.created && (
-          <div className="mt-1 text-[10px] text-gray-600">
-            Created: {new Date(activeNote.frontmatter.created).toLocaleDateString()}
-            {activeNote.frontmatter.updated && (
-              <> &middot; Updated: {new Date(activeNote.frontmatter.updated).toLocaleDateString()}</>
-            )}
+        <div className="mt-2 flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <span className="text-[11px] text-gray-500 shrink-0">Tags:</span>
+            <input
+              type="text"
+              value={tags}
+              onChange={handleTagsChange}
+              className="flex-1 bg-gray-800/50 text-sm text-gray-300 focus:outline-none placeholder-gray-600 rounded px-2 py-0.5"
+              placeholder="tag1, tag2, tag3"
+            />
           </div>
-        )}
+          {activeNote.frontmatter?.created && (
+            <span className="text-[10px] text-gray-600 shrink-0">
+              {new Date(activeNote.frontmatter.updated || activeNote.frontmatter.created).toLocaleDateString()}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Editor / Preview */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Editor pane */}
         <div className={`${showPreview ? 'w-1/2 border-r border-gray-800' : 'w-full'} flex flex-col`}>
           <textarea
             value={body}
             onChange={handleBodyChange}
-            className="editor-textarea flex-1 w-full bg-gray-950 text-gray-200 p-4 focus:outline-none text-sm leading-relaxed"
+            className="editor-textarea flex-1 w-full bg-gray-950 text-gray-200 p-5 focus:outline-none text-sm leading-relaxed"
             placeholder="Start writing in Markdown..."
             spellCheck={false}
           />
         </div>
-
-        {/* Preview pane */}
         {showPreview && (
           <div className="w-1/2 overflow-y-auto p-6 bg-gray-950/50">
-            <div
-              ref={previewRef}
-              className="prose-vault max-w-none"
-              dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
-            />
+            <div ref={previewRef} className="prose-vault max-w-none" dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
           </div>
         )}
       </div>
