@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Editor textarea */
+.editor-textarea {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  tab-size: 2;
+  resize: none;
+}
+
+/* Markdown preview prose */
+.prose-vault {
+  color: #e2e8f0;
+  line-height: 1.75;
+}
+
+.prose-vault h1, .prose-vault h2, .prose-vault h3, .prose-vault h4 {
+  color: #f1f5f9;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose-vault h1 { font-size: 1.875rem; }
+.prose-vault h2 { font-size: 1.5rem; }
+.prose-vault h3 { font-size: 1.25rem; }
+
+.prose-vault p {
+  margin-bottom: 1em;
+}
+
+.prose-vault a {
+  color: #818cf8;
+  text-decoration: underline;
+}
+
+.prose-vault a:hover {
+  color: #a5b4fc;
+}
+
+.prose-vault code {
+  background: #1e293b;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose-vault pre {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+
+.prose-vault pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.prose-vault blockquote {
+  border-left: 3px solid #6366f1;
+  padding-left: 1rem;
+  color: #94a3b8;
+  margin-bottom: 1em;
+}
+
+.prose-vault ul, .prose-vault ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1em;
+}
+
+.prose-vault ul { list-style-type: disc; }
+.prose-vault ol { list-style-type: decimal; }
+
+.prose-vault li {
+  margin-bottom: 0.25em;
+}
+
+.prose-vault table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1em;
+}
+
+.prose-vault th, .prose-vault td {
+  border: 1px solid #334155;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.prose-vault th {
+  background: #1e293b;
+  font-weight: 600;
+}
+
+.prose-vault hr {
+  border-color: #334155;
+  margin: 1.5em 0;
+}
+
+.prose-vault img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}
+
+/* Wikilink styles */
+.wikilink {
+  color: #818cf8;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed #818cf8;
+}
+
+.wikilink:hover {
+  color: #a5b4fc;
+  border-bottom-color: #a5b4fc;
+}
+
+.wikilink.broken {
+  color: #f87171;
+  border-bottom-color: #f87171;
+}
