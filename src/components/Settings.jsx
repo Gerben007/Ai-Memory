@@ -7,6 +7,8 @@ import JSZip from 'jszip'
 export default function Settings() {
   const apiKey = useStore(s => s.apiKey)
   const setApiKey = useStore(s => s.setApiKey)
+  const model = useStore(s => s.model)
+  const setModel = useStore(s => s.setModel)
   const notes = useStore(s => s.notes)
   const bm25Index = useStore(s => s.bm25Index)
   const clearChat = useStore(s => s.clearChat)
@@ -125,6 +127,38 @@ export default function Settings() {
                 {keyStatus}
               </span>
             )}
+          </div>
+        </section>
+
+        {/* Model Selection */}
+        <section>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">AI Model</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Used for Chat and Brainstorm. If you get overload errors, try a different model.
+          </p>
+          <div className="space-y-2">
+            {[
+              { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', desc: 'Best balance of speed and quality' },
+              { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', desc: 'Fastest, most available, lower cost' },
+              { id: 'claude-opus-4-20250514', label: 'Claude Opus 4', desc: 'Most capable, slower, higher cost' }
+            ].map(m => (
+              <button
+                key={m.id}
+                onClick={() => setModel(m.id)}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                  model === m.id
+                    ? 'bg-indigo-600/10 border-indigo-500/50 text-gray-200'
+                    : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-300'
+                }`}
+              >
+                <div className="text-sm font-medium flex items-center gap-2">
+                  {m.label}
+                  {model === m.id && <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded">Active</span>}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+                <div className="text-[10px] text-gray-600 mt-0.5 font-mono">{m.id}</div>
+              </button>
+            ))}
           </div>
         </section>
 

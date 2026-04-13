@@ -135,6 +135,7 @@ function buildContext(results) {
 export default function BrainstormPanel() {
   const search = useStore(s => s.search)
   const apiKey = useStore(s => s.apiKey)
+  const model = useStore(s => s.model)
   const notes = useStore(s => s.notes)
   const setActiveView = useStore(s => s.setActiveView)
   const quickCapture = useStore(s => s.quickCapture)
@@ -194,7 +195,7 @@ export default function BrainstormPanel() {
 
     try {
       const res = await chatCompletion({
-        model: 'claude-sonnet-4-20250514',
+        model,
         max_tokens: 2048,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],

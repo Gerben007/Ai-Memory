@@ -6,6 +6,7 @@ import { BM25Index } from './bm25'
 
 const CHAT_STORAGE_KEY = 'kv-chat-messages'
 const API_KEY_STORAGE_KEY = 'kv-anthropic-key'
+const MODEL_STORAGE_KEY = 'kv-model'
 
 function parseFrontmatter(content) {
   try {
@@ -248,5 +249,11 @@ export const useStore = create((set, get) => ({
   setApiKey: (key) => {
     localStorage.setItem(API_KEY_STORAGE_KEY, key)
     set({ apiKey: key })
+  },
+
+  model: localStorage.getItem(MODEL_STORAGE_KEY) || 'claude-sonnet-4-20250514',
+  setModel: (model) => {
+    localStorage.setItem(MODEL_STORAGE_KEY, model)
+    set({ model })
   }
 }))

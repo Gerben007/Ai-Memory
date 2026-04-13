@@ -31,6 +31,7 @@ export default function ChatPanel() {
   const addMessage = useStore(s => s.addMessage)
   const updateLastMessage = useStore(s => s.updateLastMessage)
   const apiKey = useStore(s => s.apiKey)
+  const model = useStore(s => s.model)
   const search = useStore(s => s.search)
   const setActiveView = useStore(s => s.setActiveView)
 
@@ -85,7 +86,7 @@ export default function ChatPanel() {
     setLoading(true)
     try {
       const res = await chatCompletion({
-        model: 'claude-sonnet-4-20250514',
+        model,
         max_tokens: 1024,
         system: systemPrompt,
         messages: recentMessages,
