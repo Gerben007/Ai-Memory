@@ -98,9 +98,11 @@ function buildGraphData(notes) {
     node.radius = Math.max(8, Math.min(36, 8 + Math.sqrt(node.connections) * 6))
   }
 
-  const allTags = new Set()
-  notes.forEach(n => getTags(n).forEach(t => allTags.add(t)))
-  return { nodes, edges, allTags: [...allTags] }
+  // Count notes per tag, sorted by usage
+  const tagCounts = new Map()
+  notes.forEach(n => getTags(n).forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1)))
+  const allTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count }))
+  return { nodes, edges, allTags }
 }
 
 // ── Note Popup ──────────────────────────────────────────────────────────
@@ -139,78 +141,100 @@ function NotePopup({ note, onClose, onOpenEditor }) {
   )
 }
 
-// ── Legend with search + tag highlight ───────────────────────────────────
+// ── Tag selector panel ──────────────────────────────────────────────────
 function GraphLegend({ allTags, selectedTag, onSelectTag }) {
   const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState(false)
 
   if (allTags.length === 0) return null
 
   const filtered = search.trim()
-    ? allTags.filter(t => t.toLowerCase().includes(search.toLowerCase()))
+    ? allTags.filter(t => t.tag.toLowerCase().includes(search.toLowerCase()))
     : allTags
 
-  const VISIBLE_COUNT = 5
-  const visible = expanded ? filtered : filtered.slice(0, VISIBLE_COUNT)
-  const hasMore = filtered.length > VISIBLE_COUNT
+  const maxCount = allTags.length > 0 ? allTags[0].count : 1
 
   return (
-    <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 bg-gray-900/95 border border-gray-800 rounded-xl backdrop-blur-sm z-10 w-52 md:w-56 overflow-hidden text-xs">
+    <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 bg-gray-900/95 border border-gray-800 rounded-xl backdrop-blur-sm z-10 w-56 md:w-60 overflow-hidden text-xs">
+      {/* Header with clear button */}
+      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
+        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Tags</span>
+        {selectedTag && (
+          <button
+            onClick={() => onSelectTag(null)}
+            className="text-[10px] text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Search */}
-      <div className="p-2 border-b border-gray-800">
+      <div className="px-2 pb-2">
         <input
           type="text"
           value={search}
-          onChange={e => { setSearch(e.target.value); setExpanded(true) }}
-          placeholder="Search tags..."
-          className="w-full bg-gray-800 text-gray-200 text-[11px] rounded px-2 py-1 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Filter tags..."
+          className="w-full bg-gray-800/80 text-gray-200 text-[11px] rounded-lg px-2.5 py-1.5 border border-gray-700/50 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
         />
       </div>
 
-      {/* Tag list */}
-      <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
-        {visible.length === 0 && (
-          <div className="text-gray-500 text-[10px] text-center py-1">No matching tags</div>
+      {/* Tag list — all visible, scrollable */}
+      <div className="px-2 pb-2 space-y-0.5 max-h-56 overflow-y-auto">
+        {filtered.length === 0 && (
+          <div className="text-gray-500 text-[10px] text-center py-2">No matching tags</div>
         )}
-        {visible.map(tag => {
+        {filtered.map(({ tag, count }) => {
           const isActive = selectedTag === tag
+          const color = getTagColor(tag)
+          const barWidth = Math.max(8, (count / maxCount) * 100)
+
           return (
             <button
               key={tag}
               onClick={() => onSelectTag(isActive ? null : tag)}
-              className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left transition-colors ${
-                isActive ? 'bg-gray-800 ring-1 ring-inset' : 'hover:bg-gray-800/60'
-              }`}
-              style={isActive ? { ringColor: getTagColor(tag) } : undefined}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all relative overflow-hidden"
+              style={{
+                backgroundColor: isActive ? color + '20' : 'transparent',
+                borderLeft: isActive ? `3px solid ${color}` : '3px solid transparent'
+              }}
             >
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getTagColor(tag) }} />
-              <span className="truncate" style={{ color: isActive ? getTagColor(tag) : '#94a3b8' }}>{tag}</span>
+              {/* Usage bar background */}
+              <div
+                className="absolute inset-y-0 left-0 opacity-[0.04] rounded-lg transition-all"
+                style={{ width: `${barWidth}%`, backgroundColor: color }}
+              />
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 relative transition-transform"
+                style={{
+                  backgroundColor: color,
+                  transform: isActive ? 'scale(1.3)' : 'scale(1)',
+                  boxShadow: isActive ? `0 0 8px ${color}60` : 'none'
+                }}
+              />
+              <span
+                className="truncate relative flex-1 transition-colors"
+                style={{ color: isActive ? color : '#94a3b8', fontWeight: isActive ? 600 : 400 }}
+              >
+                {tag}
+              </span>
+              <span
+                className="text-[10px] relative shrink-0 tabular-nums"
+                style={{ color: isActive ? color + 'cc' : '#4b5563' }}
+              >
+                {count}
+              </span>
             </button>
           )
         })}
-
-        {/* Show more / less */}
-        {hasMore && !expanded && (
-          <button onClick={() => setExpanded(true)} className="w-full text-center text-[10px] text-indigo-400 hover:text-indigo-300 py-1">
-            +{filtered.length - VISIBLE_COUNT} more
-          </button>
-        )}
-        {expanded && filtered.length > VISIBLE_COUNT && (
-          <button onClick={() => setExpanded(false)} className="w-full text-center text-[10px] text-gray-500 hover:text-gray-300 py-1">
-            Show less
-          </button>
-        )}
       </div>
 
-      {/* Visual legend */}
-      <div className="px-2 pb-2 pt-1 border-t border-gray-800 space-y-1 text-[10px] text-gray-500">
+      {/* Edge/visual legend */}
+      <div className="px-3 pb-2 pt-1.5 border-t border-gray-800/80 space-y-1 text-[10px] text-gray-500">
         <div className="flex items-center gap-2"><span className="w-4 h-0.5 bg-indigo-500 inline-block rounded" /> Wikilink</div>
         <div className="flex items-center gap-2"><span className="w-4 h-0 inline-block border-t border-dashed border-pink-400" /> Shared tag</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-400" /><span className="inline-block w-3 h-3 rounded-full bg-gray-400" /> Size = connections</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_6px_2px_rgba(129,140,248,0.5)]" /> Glow = recent</div>
-        {selectedTag && (
-          <button onClick={() => onSelectTag(null)} className="text-indigo-400 hover:text-indigo-300 mt-1">Clear filter</button>
-        )}
       </div>
     </div>
   )
@@ -361,7 +385,7 @@ export default function GraphView() {
       }
 
       // Nodes
-      const now = Date.now()
+      const now = performance.now()
       for (const node of nodes) {
         const isHovered = hoverId === node.id
         const matches = matchesFilter(node)
@@ -371,18 +395,19 @@ export default function GraphView() {
 
         // Recency glow — recent notes pulse, old notes are dim
         const recency = node.recency
-        if (!dimmed && recency > 0.1) {
-          // Animated pulse: subtle breathing effect for recent notes
-          const pulse = 0.5 + 0.5 * Math.sin(now / 800 + hashCode(node.id) * 0.5)
-          const glowIntensity = recency * (0.6 + pulse * 0.4)
-          const glowRadius = r + 6 + recency * 12
-          ctx.shadowColor = node.color
-          ctx.shadowBlur = glowIntensity * 25
-          ctx.globalAlpha = glowIntensity * 0.35
-          ctx.fillStyle = node.color
+        if (!dimmed && recency > 0.05) {
+          // Each node gets a unique phase offset so they don't pulse in sync
+          const phase = (hashCode(node.id) % 628) / 100 // 0..~6.28 (one full cycle)
+          const pulse = 0.5 + 0.5 * Math.sin(now / 1200 + phase)
+          const glowIntensity = recency * (0.5 + pulse * 0.5)
+          const glowRadius = r + 4 + recency * 14
+
+          // Outer glow ring (no shadow needed — draw a transparent radial gradient)
+          const glowGrad = ctx.createRadialGradient(node.x, node.y, r, node.x, node.y, glowRadius)
+          glowGrad.addColorStop(0, node.color + Math.round(glowIntensity * 80).toString(16).padStart(2, '0'))
+          glowGrad.addColorStop(1, node.color + '00')
+          ctx.fillStyle = glowGrad
           ctx.beginPath(); ctx.arc(node.x, node.y, glowRadius, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 1
-          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
         }
 
         // Node body
@@ -390,8 +415,11 @@ export default function GraphView() {
         if (dimmed) {
           grad.addColorStop(0, '#334155'); grad.addColorStop(1, '#1e293b')
         } else {
+          // Brighter core for recent notes
+          const coreAlpha = recency > 0.3 ? 'ff' : 'cc'
+          grad.addColorStop(0, node.color.slice(0, 7) + coreAlpha)
+          grad.addColorStop(1, node.color + '88')
           if (isHovered) { ctx.shadowColor = node.color; ctx.shadowBlur = 30 }
-          grad.addColorStop(0, node.color); grad.addColorStop(1, node.color + '88')
         }
 
         ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, Math.PI * 2); ctx.fill()

@@ -53,18 +53,20 @@ export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
     // Parse error
     let errMsg = `API error (${res.status})`
     let errType = 'api_error'
+    let errDetail = ''
     try {
       const json = await res.json()
       const err = json.error
       if (typeof err === 'object' && err !== null) {
         errMsg = err.message || JSON.stringify(err)
         errType = err.type || 'api_error'
+        errDetail = err.detail || ''
       } else if (typeof err === 'string') {
         errMsg = err
       }
     } catch {}
 
-    lastError = { message: errMsg, type: errType, status: res.status }
+    lastError = { message: errMsg, type: errType, status: res.status, detail: errDetail }
 
     // Only retry on overload (529) or rate limit (429)
     if (res.status !== 529 && res.status !== 429) break
@@ -73,5 +75,6 @@ export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
   const err = new Error(lastError.message)
   err.type = lastError.type
   err.status = lastError.status
+  err.detail = lastError.detail
   throw err
 }

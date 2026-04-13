@@ -10,6 +10,10 @@ export function createAnthropicProxy() {
     }
 
     try {
+      const bodyStr = JSON.stringify(req.body)
+      const bodySize = Buffer.byteLength(bodyStr)
+      console.log(`[Anthropic] Request: model=${req.body.model} max_tokens=${req.body.max_tokens} body_size=${bodySize}b messages=${req.body.messages?.length || 0}`)
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -17,18 +21,23 @@ export function createAnthropicProxy() {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify(req.body)
+        body: bodyStr
       })
 
       if (!response.ok) {
         const errorText = await response.text()
+        console.error(`[Anthropic] Error ${response.status}: ${errorText.slice(0, 500)}`)
         try {
           const parsed = JSON.parse(errorText)
           const msg = parsed.error?.message || parsed.message || errorText
           const type = parsed.error?.type || 'api_error'
-          return res.status(response.status).json({ error: { type, message: msg } })
+          return res.status(response.status).json({
+            error: { type, message: msg, status: response.status, detail: `Model: ${req.body.model}, Body: ${bodySize}b` }
+          })
         } catch {
-          return res.status(response.status).json({ error: { type: 'api_error', message: errorText } })
+          return res.status(response.status).json({
+            error: { type: 'api_error', message: errorText, status: response.status }
+          })
         }
       }
 
