@@ -93,18 +93,18 @@ export default function ChatPanel() {
       }, apiKey)
 
       const data = await res.json()
-      let fullContent = data.content?.[0]?.text
-
-      if (!fullContent && data.error) {
-        fullContent = `API Error: ${data.error.message || JSON.stringify(data.error)}`
-      }
+      const fullContent = data.content?.[0]?.text
 
       updateLastMessage({ content: fullContent || 'No response — try again.', sources })
     } catch (err) {
-      updateLastMessage({
-        content: `Error: ${err.message}`,
-        sources: []
-      })
+      const isOverload = err.type === 'overloaded_error' || err.status === 529
+      const isRateLimit = err.type === 'rate_limit_error' || err.status === 429
+      const msg = isOverload
+        ? 'Anthropic API is overloaded. Wait 30 seconds and try again.'
+        : isRateLimit
+          ? 'Rate limit reached. Wait a minute and try again.'
+          : `Error: ${err.message}`
+      updateLastMessage({ content: msg, sources: [] })
     } finally {
       setLoading(false)
     }

@@ -206,13 +206,19 @@ export default function BrainstormPanel() {
 
       if (text) {
         setResponse(text)
-      } else if (data.error) {
-        setResponse(`**API Error:** ${data.error.message || JSON.stringify(data.error)}\n\nTry again in a moment.`)
       } else {
         setResponse('No response received. Try clicking **Regenerate**.')
       }
     } catch (err) {
-      setResponse(`**Error:** ${err.message}\n\nThe Anthropic API may be overloaded. Wait a moment and click **Regenerate** or **Go** to try again.`)
+      const isOverload = err.type === 'overloaded_error' || err.status === 529
+      const isRateLimit = err.type === 'rate_limit_error' || err.status === 429
+      if (isOverload) {
+        setResponse('**Anthropic API is overloaded.** This happens during peak usage. Wait 30 seconds and click **Regenerate** to try again.')
+      } else if (isRateLimit) {
+        setResponse('**Rate limit reached.** You\'re sending requests too quickly. Wait a minute and try again.')
+      } else {
+        setResponse(`**Error:** ${err.message}\n\nCheck your API key in Settings, or try again in a moment.`)
+      }
     } finally {
       setLoading(false)
     }

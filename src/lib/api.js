@@ -30,28 +30,48 @@ export async function deleteNote(filename) {
   return res.json()
 }
 
-export async function chatCompletion(body, apiKey) {
-  const res = await fetch(`${API_BASE}/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey
-    },
-    body: JSON.stringify(body)
-  })
-  if (!res.ok) {
+export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
+  let lastError
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (attempt > 0) {
+      // Exponential backoff: 2s, 4s
+      await new Promise(r => setTimeout(r, 2000 * attempt))
+    }
+
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (res.ok) return res
+
+    // Parse error
     let errMsg = `API error (${res.status})`
+    let errType = 'api_error'
     try {
-      const text = await res.text()
-      // Try to parse as JSON
-      try {
-        const json = JSON.parse(text)
-        errMsg = json.error?.message || json.error || json.message || text
-      } catch {
-        errMsg = text || errMsg
+      const json = await res.json()
+      const err = json.error
+      if (typeof err === 'object' && err !== null) {
+        errMsg = err.message || JSON.stringify(err)
+        errType = err.type || 'api_error'
+      } else if (typeof err === 'string') {
+        errMsg = err
       }
     } catch {}
-    throw new Error(errMsg)
+
+    lastError = { message: errMsg, type: errType, status: res.status }
+
+    // Only retry on overload (529) or rate limit (429)
+    if (res.status !== 529 && res.status !== 429) break
   }
-  return res
+
+  const err = new Error(lastError.message)
+  err.type = lastError.type
+  err.status = lastError.status
+  throw err
 }

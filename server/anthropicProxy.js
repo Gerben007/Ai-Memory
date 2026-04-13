@@ -21,8 +21,15 @@ export function createAnthropicProxy() {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        return res.status(response.status).json({ error })
+        const errorText = await response.text()
+        try {
+          const parsed = JSON.parse(errorText)
+          const msg = parsed.error?.message || parsed.message || errorText
+          const type = parsed.error?.type || 'api_error'
+          return res.status(response.status).json({ error: { type, message: msg } })
+        } catch {
+          return res.status(response.status).json({ error: { type: 'api_error', message: errorText } })
+        }
       }
 
       // If streaming, pipe the response
