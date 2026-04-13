@@ -3,6 +3,7 @@ import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { getTagColor, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
+import { saveNote as apiSaveNote } from '../lib/api'
 import matter from 'gray-matter'
 
 export default function Editor() {
@@ -204,7 +205,7 @@ export default function Editor() {
     const results = []
 
     for (const section of detectSections) {
-      const sectionTitle = `${section.heading}`
+      const sectionTitle = section.heading
       const slug = sectionTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
       const filename = `${slug}.md`
 
@@ -214,19 +215,23 @@ export default function Editor() {
         continue
       }
 
-      const now = new Date().toISOString()
-      const sectionContent = `---\ntitle: "${sectionTitle}"\ntags: [${baseTags.join(', ')}]\ncreated: ${now}\nupdated: ${now}\n---\n\n${section.body}\n\n---\n\n*Split from [[${parentTitle}]]*\n`
-
       try {
-        const { frontmatter, body: b } = matter(sectionContent)
-        await saveNote(filename, sectionContent)
+        const now = new Date().toISOString()
+        // Use gray-matter to safely build frontmatter (handles special chars)
+        const fm = { title: sectionTitle, tags: baseTags, created: now, updated: now }
+        const sectionBody = `${section.body}\n\n---\n\n*Split from [[${parentTitle}]]*`
+        const sectionContent = matter.stringify(sectionBody, fm)
+
+        // Use API directly to create new file (store.saveNote only updates existing)
+        await apiSaveNote(filename, sectionContent)
         results.push({ title: sectionTitle, filename, status: 'created' })
-      } catch {
+      } catch (err) {
+        console.error('Split error:', err)
         results.push({ title: sectionTitle, filename, status: 'error' })
       }
     }
 
-    // Reload notes to pick up new ones
+    // Reload all notes to pick up new ones
     await useStore.getState().loadNotes()
     useStore.getState().rebuildIndex()
 

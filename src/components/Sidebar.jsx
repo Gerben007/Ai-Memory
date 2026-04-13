@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore, TEMPLATES } from '../lib/store'
-import { getTagColor } from '../lib/tagUtils'
+import { getTagColor, getAllTagsWithCounts } from '../lib/tagUtils'
+import TagCleanup from './TagCleanup'
 
 const NAV_ITEMS = [
   { key: 'editor', label: 'Notes', icon: '📝' },
@@ -34,6 +35,9 @@ export default function Sidebar({ onNavigate }) {
   const [quickText, setQuickText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [captureStatus, setCaptureStatus] = useState('')
+  const [showTagCleanup, setShowTagCleanup] = useState(false)
+
+  const tagCount = getAllTagsWithCounts(notes).size
 
   let displayedNotes = notes
   if (searchQuery.trim()) {
@@ -112,6 +116,13 @@ export default function Sidebar({ onNavigate }) {
           className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
         >
           🎲 Random
+        </button>
+        <button
+          onClick={() => setShowTagCleanup(true)}
+          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
+          title={`${tagCount} tags — clean up, merge, rename`}
+        >
+          🏷 Tags
         </button>
       </div>
 
@@ -230,6 +241,8 @@ export default function Sidebar({ onNavigate }) {
           </button>
         ))}
       </nav>
+
+      {showTagCleanup && <TagCleanup onClose={() => setShowTagCleanup(false)} />}
     </aside>
   )
 }
