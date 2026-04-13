@@ -144,6 +144,7 @@ function NotePopup({ note, onClose, onOpenEditor }) {
 // ── Tag selector panel ──────────────────────────────────────────────────
 function GraphLegend({ allTags, selectedTag, onSelectTag }) {
   const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
 
   if (allTags.length === 0) return null
 
@@ -152,91 +153,119 @@ function GraphLegend({ allTags, selectedTag, onSelectTag }) {
     : allTags
 
   const maxCount = allTags.length > 0 ? allTags[0].count : 1
+  const selectedInfo = selectedTag ? allTags.find(t => t.tag === selectedTag) : null
 
+  // Mobile: collapsed toggle button. Desktop: always open panel.
   return (
-    <div className="absolute bottom-3 left-3 md:bottom-4 md:left-4 bg-gray-900/95 border border-gray-800 rounded-xl backdrop-blur-sm z-10 w-56 md:w-60 overflow-hidden text-xs">
-      {/* Header with clear button */}
-      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Tags</span>
-        {selectedTag && (
-          <button
-            onClick={() => onSelectTag(null)}
-            className="text-[10px] text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition-colors"
-          >
-            Clear
-          </button>
+    <>
+      {/* Mobile toggle button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="md:hidden absolute bottom-3 left-3 z-10 bg-gray-900/95 border border-gray-800 rounded-xl backdrop-blur-sm px-3 py-2 flex items-center gap-2 text-xs"
+        style={selectedTag ? { borderColor: getTagColor(selectedTag) + '50' } : undefined}
+      >
+        <span className="text-gray-400">🏷</span>
+        {selectedTag ? (
+          <span style={{ color: getTagColor(selectedTag) }}>{selectedTag}</span>
+        ) : (
+          <span className="text-gray-400">Tags</span>
         )}
-      </div>
+        <span className="text-[10px] text-gray-600">{open ? '▼' : '▲'}</span>
+      </button>
 
-      {/* Search */}
-      <div className="px-2 pb-2">
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Filter tags..."
-          className="w-full bg-gray-800/80 text-gray-200 text-[11px] rounded-lg px-2.5 py-1.5 border border-gray-700/50 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
-        />
-      </div>
-
-      {/* Tag list — all visible, scrollable */}
-      <div className="px-2 pb-2 space-y-0.5 max-h-56 overflow-y-auto">
-        {filtered.length === 0 && (
-          <div className="text-gray-500 text-[10px] text-center py-2">No matching tags</div>
-        )}
-        {filtered.map(({ tag, count }) => {
-          const isActive = selectedTag === tag
-          const color = getTagColor(tag)
-          const barWidth = Math.max(8, (count / maxCount) * 100)
-
-          return (
+      {/* Panel — always visible on desktop, toggled on mobile */}
+      <div className={`absolute z-20 bg-gray-900/95 border border-gray-800 rounded-xl backdrop-blur-sm overflow-hidden text-xs transition-all
+        ${open ? 'bottom-14 left-3 right-3 max-h-[60vh]' : 'hidden'}
+        md:block md:bottom-4 md:left-4 md:right-auto md:w-60 md:max-h-none
+      `}>
+        {/* Header */}
+        <div className="px-3 pt-2.5 pb-1 flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Tags</span>
+          <div className="flex items-center gap-2">
+            {selectedTag && (
+              <button
+                onClick={() => onSelectTag(null)}
+                className="text-[10px] text-gray-400 hover:text-white px-1.5 py-0.5 rounded bg-gray-800 hover:bg-gray-700 transition-colors"
+              >
+                Clear
+              </button>
+            )}
             <button
-              key={tag}
-              onClick={() => onSelectTag(isActive ? null : tag)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all relative overflow-hidden"
-              style={{
-                backgroundColor: isActive ? color + '20' : 'transparent',
-                borderLeft: isActive ? `3px solid ${color}` : '3px solid transparent'
-              }}
-            >
-              {/* Usage bar background */}
-              <div
-                className="absolute inset-y-0 left-0 opacity-[0.04] rounded-lg transition-all"
-                style={{ width: `${barWidth}%`, backgroundColor: color }}
-              />
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0 relative transition-transform"
-                style={{
-                  backgroundColor: color,
-                  transform: isActive ? 'scale(1.3)' : 'scale(1)',
-                  boxShadow: isActive ? `0 0 8px ${color}60` : 'none'
-                }}
-              />
-              <span
-                className="truncate relative flex-1 transition-colors"
-                style={{ color: isActive ? color : '#94a3b8', fontWeight: isActive ? 600 : 400 }}
-              >
-                {tag}
-              </span>
-              <span
-                className="text-[10px] relative shrink-0 tabular-nums"
-                style={{ color: isActive ? color + 'cc' : '#4b5563' }}
-              >
-                {count}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+              onClick={() => setOpen(false)}
+              className="md:hidden text-gray-500 hover:text-gray-300 text-sm leading-none"
+            >&times;</button>
+          </div>
+        </div>
 
-      {/* Edge/visual legend */}
-      <div className="px-3 pb-2 pt-1.5 border-t border-gray-800/80 space-y-1 text-[10px] text-gray-500">
-        <div className="flex items-center gap-2"><span className="w-4 h-0.5 bg-indigo-500 inline-block rounded" /> Wikilink</div>
-        <div className="flex items-center gap-2"><span className="w-4 h-0 inline-block border-t border-dashed border-pink-400" /> Shared tag</div>
-        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-400" /><span className="inline-block w-3 h-3 rounded-full bg-gray-400" /> Size = connections</div>
-        <div className="flex items-center gap-2"><span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_6px_2px_rgba(129,140,248,0.5)]" /> Glow = recent</div>
+        {/* Search */}
+        <div className="px-2 pb-2">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Filter tags..."
+            className="w-full bg-gray-800/80 text-gray-200 text-[11px] rounded-lg px-2.5 py-1.5 border border-gray-700/50 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+          />
+        </div>
+
+        {/* Tag list */}
+        <div className="px-2 pb-2 space-y-0.5 max-h-48 md:max-h-56 overflow-y-auto">
+          {filtered.length === 0 && (
+            <div className="text-gray-500 text-[10px] text-center py-2">No matching tags</div>
+          )}
+          {filtered.map(({ tag, count }) => {
+            const isActive = selectedTag === tag
+            const color = getTagColor(tag)
+            const barWidth = Math.max(8, (count / maxCount) * 100)
+
+            return (
+              <button
+                key={tag}
+                onClick={() => { onSelectTag(isActive ? null : tag); if (window.innerWidth < 768) setOpen(false) }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all relative overflow-hidden"
+                style={{
+                  backgroundColor: isActive ? color + '20' : 'transparent',
+                  borderLeft: isActive ? `3px solid ${color}` : '3px solid transparent'
+                }}
+              >
+                <div
+                  className="absolute inset-y-0 left-0 opacity-[0.04] rounded-lg transition-all"
+                  style={{ width: `${barWidth}%`, backgroundColor: color }}
+                />
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0 relative transition-transform"
+                  style={{
+                    backgroundColor: color,
+                    transform: isActive ? 'scale(1.3)' : 'scale(1)',
+                    boxShadow: isActive ? `0 0 8px ${color}60` : 'none'
+                  }}
+                />
+                <span
+                  className="truncate relative flex-1 transition-colors"
+                  style={{ color: isActive ? color : '#94a3b8', fontWeight: isActive ? 600 : 400 }}
+                >
+                  {tag}
+                </span>
+                <span
+                  className="text-[10px] relative shrink-0 tabular-nums"
+                  style={{ color: isActive ? color + 'cc' : '#4b5563' }}
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Legend — desktop only */}
+        <div className="hidden md:block px-3 pb-2 pt-1.5 border-t border-gray-800/80 space-y-1 text-[10px] text-gray-500">
+          <div className="flex items-center gap-2"><span className="w-4 h-0.5 bg-indigo-500 inline-block rounded" /> Wikilink</div>
+          <div className="flex items-center gap-2"><span className="w-4 h-0 inline-block border-t border-dashed border-pink-400" /> Shared tag</div>
+          <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-400" /><span className="inline-block w-3 h-3 rounded-full bg-gray-400" /> Size = connections</div>
+          <div className="flex items-center gap-2"><span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_6px_2px_rgba(129,140,248,0.5)]" /> Glow = recent</div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -427,8 +456,10 @@ export default function GraphView() {
         ctx.lineWidth = isHovered ? 2 : 1; ctx.stroke()
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
 
-        // Label — hover OR matching filter OR hub nodes (5+ connections)
-        if (isHovered || (filterTag && matches) || node.connections >= 5) {
+        // Label — hover OR matching filter. Hub labels only on desktop to avoid clutter.
+        const isMobile = w < 768
+        const showLabel = isHovered || (filterTag && matches) || (!isMobile && node.connections >= 5)
+        if (showLabel) {
           ctx.fillStyle = isHovered ? '#f1f5f9' : '#94a3b8'
           ctx.font = `${isHovered ? 'bold ' : ''}${isHovered ? 13 : 11}px system-ui, sans-serif`
           ctx.textAlign = 'center'; ctx.fillText(node.title, node.x, node.y + r + 16)
