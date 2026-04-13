@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import { useStore } from '../lib/store'
 import { extractWikilinks } from '../lib/wikilinkParser'
 import { renderMarkdown } from '../lib/markdownParser'
-import { getTagColor } from '../lib/tagUtils'
+import { getTagColor, getTags } from '../lib/tagUtils'
 
 const REPULSION = 12000
 const SPRING_STRENGTH = 0.015
@@ -17,14 +17,6 @@ function hashCode(str) {
   let hash = 0
   for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0 }
   return Math.abs(hash)
-}
-
-function getTags(note) {
-  if (note.frontmatter?.tags && Array.isArray(note.frontmatter.tags) && note.frontmatter.tags.length > 0) return note.frontmatter.tags
-  const raw = note.content || ''
-  const m = raw.match(/^tags:\s*\[([^\]]*)\]/m)
-  if (m) return m[1].split(',').map(t => t.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
-  return []
 }
 
 function getTitle(note) {

@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from '../lib/store'
-import { getTagColor, analyzeTagHealth } from '../lib/tagUtils'
+import { getTagColor, getTags, analyzeTagHealth } from '../lib/tagUtils'
 import matter from 'gray-matter'
 
 export default function TagCleanup({ onClose }) {
@@ -30,14 +30,13 @@ export default function TagCleanup({ onClose }) {
 
     let count = 0
     for (const note of notes) {
-      const noteTags = note.frontmatter?.tags
-      if (!Array.isArray(noteTags) || !noteTags.includes(oldTag)) continue
+      const noteTags = getTags(note)
+      if (!noteTags.includes(oldTag)) continue
 
-      // Replace old tag with new, avoid duplicates
       const updatedTags = noteTags.map(t => t === oldTag ? newTag : t)
       const dedupedTags = [...new Set(updatedTags)]
 
-      const fm = { ...note.frontmatter, tags: dedupedTags, updated: new Date().toISOString() }
+      const fm = { ...(note.frontmatter || {}), tags: dedupedTags, updated: new Date().toISOString() }
       const content = matter.stringify(note.body || '', fm)
       await saveNote(note.filename, content)
       count++
@@ -57,11 +56,11 @@ export default function TagCleanup({ onClose }) {
 
     let count = 0
     for (const note of notes) {
-      const noteTags = note.frontmatter?.tags
-      if (!Array.isArray(noteTags) || !noteTags.includes(tag)) continue
+      const noteTags = getTags(note)
+      if (!noteTags.includes(tag)) continue
 
       const updatedTags = noteTags.filter(t => t !== tag)
-      const fm = { ...note.frontmatter, tags: updatedTags, updated: new Date().toISOString() }
+      const fm = { ...(note.frontmatter || {}), tags: updatedTags, updated: new Date().toISOString() }
       const content = matter.stringify(note.body || '', fm)
       await saveNote(note.filename, content)
       count++
@@ -84,12 +83,12 @@ export default function TagCleanup({ onClose }) {
       for (const oldTag of issue.tags) {
         if (oldTag === issue.suggestion) continue
         for (const note of notes) {
-          const noteTags = note.frontmatter?.tags
-          if (!Array.isArray(noteTags) || !noteTags.includes(oldTag)) continue
+          const noteTags = getTags(note)
+          if (!noteTags.includes(oldTag)) continue
 
           const updatedTags = noteTags.map(t => t === oldTag ? issue.suggestion : t)
           const dedupedTags = [...new Set(updatedTags)]
-          const fm = { ...note.frontmatter, tags: dedupedTags, updated: new Date().toISOString() }
+          const fm = { ...(note.frontmatter || {}), tags: dedupedTags, updated: new Date().toISOString() }
           const content = matter.stringify(note.body || '', fm)
           await saveNote(note.filename, content)
           totalChanges++

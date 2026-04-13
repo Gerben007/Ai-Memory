@@ -16,16 +16,26 @@ export function getTagColor(tag) {
   return TAG_PALETTE[hashCode(tag) % TAG_PALETTE.length]
 }
 
+// Extract tags from a note — tries frontmatter first, falls back to raw YAML parsing
+export function getTags(note) {
+  if (note.frontmatter?.tags && Array.isArray(note.frontmatter.tags) && note.frontmatter.tags.length > 0) {
+    return note.frontmatter.tags
+  }
+  // Fallback: parse tags from raw content (handles cases where gray-matter doesn't parse correctly)
+  const raw = note.content || ''
+  const m = raw.match(/^tags:\s*\[([^\]]*)\]/m)
+  if (m) return m[1].split(',').map(t => t.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+  return []
+}
+
 // Collect all tags across the vault with usage counts
 export function getAllTagsWithCounts(notes) {
   const counts = new Map()
   for (const note of notes) {
-    const tags = note.frontmatter?.tags
-    if (Array.isArray(tags)) {
-      for (const tag of tags) {
-        const normalized = tag.trim()
-        if (normalized) counts.set(normalized, (counts.get(normalized) || 0) + 1)
-      }
+    const tags = getTags(note)
+    for (const tag of tags) {
+      const normalized = tag.trim()
+      if (normalized) counts.set(normalized, (counts.get(normalized) || 0) + 1)
     }
   }
   return counts
