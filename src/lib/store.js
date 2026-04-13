@@ -240,7 +240,7 @@ export const useStore = create((set, get) => ({
   },
 
   // UI
-  activeView: 'editor',
+  activeView: 'graph',
   setActiveView: (view) => set({ activeView: view }),
 
   // Settings
