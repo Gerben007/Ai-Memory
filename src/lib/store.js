@@ -82,6 +82,18 @@ export const TEMPLATES = {
         content: `---\ntitle: "${title}"\ntags: [research]\ncreated: ${now}\nupdated: ${now}\n---\n\n## Research Question\n\n\n\n## Sources\n\n- \n\n## Findings\n\n\n\n## Analysis\n\n\n\n## Next Steps\n\n- \n\n## Related Notes\n\n`
       }
     }
+  },
+  decision: {
+    label: 'Decision Log',
+    icon: '⚖️',
+    create: (title) => {
+      const now = new Date().toISOString()
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      return {
+        filename: `decision-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [decision]\nstatus: active\ncreated: ${now}\nupdated: ${now}\n---\n\n## Decision\n\nWhat was decided?\n\n## Context\n\nWhat situation prompted this decision?\n\n## Alternatives Considered\n\n### Option A\n- Pro: \n- Con: \n\n### Option B\n- Pro: \n- Con: \n\n## Rationale\n\nWhy was this option chosen over the alternatives?\n\n## Consequences\n\n- \n\n## Related Notes\n\n`
+      }
+    }
   }
 }
 

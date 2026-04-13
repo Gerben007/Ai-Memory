@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import ChatPanel from './components/ChatPanel'
 import BrainstormPanel from './components/BrainstormPanel'
+import DecisionsView from './components/DecisionsView'
 import GraphView from './components/GraphView'
 import AgentPanel from './components/AgentPanel'
 import Settings from './components/Settings'
@@ -73,6 +74,7 @@ export default function App() {
             {activeView === 'editor' && <Editor />}
             {activeView === 'chat' && <ChatPanel />}
             {activeView === 'brainstorm' && <BrainstormPanel />}
+            {activeView === 'decisions' && <DecisionsView />}
             {activeView === 'graph' && <GraphView />}
             {activeView === 'agent' && <AgentPanel />}
             {activeView === 'settings' && <Settings />}
