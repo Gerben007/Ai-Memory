@@ -53,7 +53,7 @@ export default function Editor() {
       updated: now
     }
 
-    // Preserve extra frontmatter fields (like status for decisions)
+    // Preserve extra frontmatter fields
     for (const [key, val] of Object.entries(fm)) {
       if (!frontmatter.hasOwnProperty(key)) {
         frontmatter[key] = val

@@ -285,49 +285,6 @@ server.tool(
   }
 )
 
-// ── Tool: Log decision ──────────────────────────────────────────────────
-
-server.tool(
-  'vault_log_decision',
-  'Log a decision with full context, reasoning, and alternatives. Creates a structured decision note in the vault.',
-  {
-    title: z.string().describe('Short title of the decision (e.g. "Use PostgreSQL over MongoDB")'),
-    decision: z.string().describe('What was decided'),
-    context: z.string().describe('What situation or problem prompted this decision'),
-    alternatives: z.array(z.object({
-      name: z.string(),
-      pros: z.array(z.string()),
-      cons: z.array(z.string())
-    })).optional().describe('Alternative options considered, each with pros and cons'),
-    rationale: z.string().describe('Why this option was chosen over alternatives'),
-    consequences: z.array(z.string()).optional().describe('Expected consequences of the decision'),
-    tags: z.array(z.string()).optional().describe('Additional tags beyond "decision"')
-  },
-  async ({ title, decision, context, alternatives = [], rationale, consequences = [], tags = [] }) => {
-    const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
-    const filename = `decision-${slug}.md`
-    const now = new Date().toISOString()
-    const allTags = ['decision', ...tags.filter(t => t !== 'decision')]
-
-    let altSection = ''
-    for (const alt of alternatives) {
-      altSection += `\n### ${alt.name}\n`
-      for (const p of alt.pros) altSection += `- Pro: ${p}\n`
-      for (const c of alt.cons) altSection += `- Con: ${c}\n`
-    }
-
-    const consSection = consequences.map(c => `- ${c}`).join('\n')
-
-    const content = `---\ntitle: "${title}"\ntags: [${allTags.join(', ')}]\nstatus: active\ncreated: ${now}\nupdated: ${now}\n---\n\n## Decision\n\n${decision}\n\n## Context\n\n${context}\n\n## Alternatives Considered\n${altSection || '\n(none documented)\n'}\n\n## Rationale\n\n${rationale}\n\n## Consequences\n\n${consSection || '- (none documented)'}\n\n## Related Notes\n\n`
-
-    await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: content })
-
-    return {
-      content: [{ type: 'text', text: `Decision logged: ${filename}\nTitle: ${title}\nStatus: active\nTags: ${allTags.join(', ')}` }]
-    }
-  }
-)
-
 // ── Start ───────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport()

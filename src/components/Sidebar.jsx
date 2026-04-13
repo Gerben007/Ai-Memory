@@ -7,7 +7,6 @@ const NAV_ITEMS = [
   { key: 'editor', label: 'Notes', icon: '📝' },
   { key: 'chat', label: 'AI Chat', icon: '💬' },
   { key: 'brainstorm', label: 'Brainstorm', icon: '🧠' },
-  { key: 'decisions', label: 'Decisions', icon: '⚖️' },
   { key: 'graph', label: 'Graph', icon: '🕸️' },
   { key: 'agent', label: 'Agent API', icon: '🤖' },
   { key: 'settings', label: 'Settings', icon: '⚙️' }
