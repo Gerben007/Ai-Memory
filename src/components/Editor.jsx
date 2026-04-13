@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
+import { getTagColor, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
 import matter from 'gray-matter'
 
 export default function Editor() {
@@ -9,6 +10,7 @@ export default function Editor() {
   const activeNoteFilename = useStore(s => s.activeNoteFilename)
   const saveNote = useStore(s => s.saveNote)
   const setActiveNote = useStore(s => s.setActiveNote)
+  const createNote = useStore(s => s.createNote)
 
   const activeNote = notes.find(n => n.filename === activeNoteFilename)
 
@@ -18,7 +20,11 @@ export default function Editor() {
   const [showPreview, setShowPreview] = useState(true)
   const [saveStatus, setSaveStatus] = useState('')
   const [dirty, setDirty] = useState(false)
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+  const [showSplitConfirm, setShowSplitConfirm] = useState(false)
+  const [splitResult, setSplitResult] = useState(null)
   const previewRef = useRef(null)
+  const tagInputRef = useRef(null)
 
   // Load note content when active note changes
   useEffect(() => {
@@ -28,6 +34,8 @@ export default function Editor() {
       setTags((activeNote.frontmatter?.tags || []).join(', '))
       setDirty(false)
       setSaveStatus('')
+      setShowSplitConfirm(false)
+      setSplitResult(null)
     }
   }, [activeNoteFilename]) // intentionally only depend on filename
 
@@ -42,6 +50,13 @@ export default function Editor() {
       tags: tagList,
       created: fm.created || now,
       updated: now
+    }
+
+    // Preserve extra frontmatter fields (like status for decisions)
+    for (const [key, val] of Object.entries(fm)) {
+      if (!frontmatter.hasOwnProperty(key)) {
+        frontmatter[key] = val
+      }
     }
 
     return matter.stringify(bodyText, frontmatter)
@@ -123,6 +138,102 @@ export default function Editor() {
     return () => preview.removeEventListener('click', handleClick)
   }, [notes, setActiveNote])
 
+  // Tag suggestions
+  const currentTagList = useMemo(() =>
+    tags.split(',').map(t => t.trim()).filter(Boolean),
+    [tags]
+  )
+
+  const tagSuggestions = useMemo(() =>
+    suggestTags(body, title, currentTagList, notes),
+    [body, title, currentTagList, notes]
+  )
+
+  const allVaultTags = useMemo(() => {
+    const counts = getAllTagsWithCounts(notes)
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .filter(([tag]) => !currentTagList.some(t => t.toLowerCase() === tag.toLowerCase()))
+  }, [notes, currentTagList])
+
+  const addTag = (tag) => {
+    const newTags = currentTagList.length > 0 ? `${tags}, ${tag}` : tag
+    setTags(newTags)
+    setDirty(true)
+    triggerSave(body, title, newTags)
+  }
+
+  // Split note by headings
+  const detectSections = useMemo(() => {
+    if (!body) return []
+    const sections = []
+    const lines = body.split('\n')
+    let currentHeading = null
+    let currentLines = []
+
+    for (const line of lines) {
+      const headingMatch = line.match(/^##\s+(.+)/)
+      if (headingMatch) {
+        if (currentHeading !== null) {
+          const text = currentLines.join('\n').trim()
+          if (text) sections.push({ heading: currentHeading, body: text })
+        }
+        currentHeading = headingMatch[1].trim()
+        currentLines = []
+      } else if (currentHeading !== null) {
+        currentLines.push(line)
+      } else {
+        // Content before first heading — goes to intro
+        currentLines.push(line)
+      }
+    }
+    // Last section
+    if (currentHeading !== null) {
+      const text = currentLines.join('\n').trim()
+      if (text) sections.push({ heading: currentHeading, body: text })
+    }
+
+    return sections
+  }, [body])
+
+  const handleSplitNote = async () => {
+    if (detectSections.length < 2) return
+
+    const parentTitle = title
+    const baseTags = currentTagList
+    const results = []
+
+    for (const section of detectSections) {
+      const sectionTitle = `${section.heading}`
+      const slug = sectionTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+      const filename = `${slug}.md`
+
+      // Skip if a note with this name already exists
+      if (notes.find(n => n.filename === filename)) {
+        results.push({ title: sectionTitle, filename, status: 'exists' })
+        continue
+      }
+
+      const now = new Date().toISOString()
+      const sectionContent = `---\ntitle: "${sectionTitle}"\ntags: [${baseTags.join(', ')}]\ncreated: ${now}\nupdated: ${now}\n---\n\n${section.body}\n\n---\n\n*Split from [[${parentTitle}]]*\n`
+
+      try {
+        const { frontmatter, body: b } = matter(sectionContent)
+        await saveNote(filename, sectionContent)
+        results.push({ title: sectionTitle, filename, status: 'created' })
+      } catch {
+        results.push({ title: sectionTitle, filename, status: 'error' })
+      }
+    }
+
+    // Reload notes to pick up new ones
+    await useStore.getState().loadNotes()
+    useStore.getState().rebuildIndex()
+
+    setSplitResult(results)
+    setShowSplitConfirm(false)
+  }
+
   if (!activeNote) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
@@ -135,6 +246,8 @@ export default function Editor() {
   }
 
   const renderedMarkdown = renderMarkdown(body)
+  const wordCount = body.split(/\s+/).filter(Boolean).length
+  const canSplit = detectSections.length >= 2
 
   return (
     <div className="flex flex-col h-full">
@@ -155,6 +268,15 @@ export default function Editor() {
             {dirty && !saveStatus && (
               <span className="text-[10px] md:text-xs text-amber-400 hidden sm:inline">Unsaved</span>
             )}
+            {canSplit && (
+              <button
+                onClick={() => setShowSplitConfirm(true)}
+                className="text-[11px] md:text-xs px-2 md:px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-400 hover:border-amber-500/50 hidden sm:inline-flex items-center gap-1"
+                title={`Split into ${detectSections.length} notes`}
+              >
+                ✂ Split
+              </button>
+            )}
             <button
               onClick={handleManualSave}
               className="text-[11px] md:text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-500 font-medium"
@@ -173,24 +295,158 @@ export default function Editor() {
             </button>
           </div>
         </div>
+
+        {/* Tags row with suggestions */}
         <div className="mt-1.5 md:mt-2 flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0 relative">
             <span className="text-[10px] md:text-[11px] text-gray-500 shrink-0">Tags:</span>
-            <input
-              type="text"
-              value={tags}
-              onChange={handleTagsChange}
-              className="flex-1 min-w-0 bg-gray-800/50 text-xs md:text-sm text-gray-300 focus:outline-none placeholder-gray-600 rounded px-2 py-0.5"
-              placeholder="tag1, tag2, tag3"
-            />
+            <div className="flex-1 flex items-center gap-1 flex-wrap min-w-0">
+              {/* Tag pills */}
+              {currentTagList.map(tag => (
+                <span
+                  key={tag}
+                  className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1"
+                  style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}
+                >
+                  {tag}
+                  <button
+                    onClick={() => {
+                      const newTags = currentTagList.filter(t => t !== tag).join(', ')
+                      setTags(newTags)
+                      setDirty(true)
+                      triggerSave(body, title, newTags)
+                    }}
+                    className="hover:opacity-70 leading-none"
+                  >&times;</button>
+                </span>
+              ))}
+              <input
+                ref={tagInputRef}
+                type="text"
+                value={tags.includes(',') ? tags.split(',').pop().trim() : (currentTagList.length === 0 ? tags : '')}
+                onChange={(e) => {
+                  const base = currentTagList.length > 0
+                    ? currentTagList.join(', ') + (e.target.value ? ', ' + e.target.value : '')
+                    : e.target.value
+                  setTags(base)
+                  setDirty(true)
+                  triggerSave(body, title, base)
+                }}
+                onFocus={() => setShowTagSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                className="flex-1 min-w-[80px] bg-transparent text-xs md:text-sm text-gray-300 focus:outline-none placeholder-gray-600"
+                placeholder={currentTagList.length === 0 ? 'Add tags...' : '+ tag'}
+              />
+            </div>
+
+            {/* Tag suggestions dropdown */}
+            {showTagSuggestions && (tagSuggestions.length > 0 || allVaultTags.length > 0) && (
+              <div className="absolute top-full left-0 right-0 mt-1 glass rounded-lg border border-white/10 shadow-xl z-50 max-h-52 overflow-y-auto">
+                {tagSuggestions.length > 0 && (
+                  <div className="p-2">
+                    <div className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">Suggested for this note</div>
+                    <div className="flex flex-wrap gap-1">
+                      {tagSuggestions.map(s => (
+                        <button
+                          key={s.tag}
+                          onMouseDown={(e) => { e.preventDefault(); addTag(s.tag) }}
+                          className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 hover:border-[var(--accent)]/50 transition-colors"
+                          style={{ color: getTagColor(s.tag) }}
+                        >
+                          + {s.tag} <span className="text-[var(--text-muted)] ml-0.5">({s.count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {allVaultTags.length > 0 && (
+                  <div className="p-2 border-t border-white/5">
+                    <div className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">All vault tags</div>
+                    <div className="flex flex-wrap gap-1">
+                      {allVaultTags.slice(0, 20).map(([tag, count]) => (
+                        <button
+                          key={tag}
+                          onMouseDown={(e) => { e.preventDefault(); addTag(tag) }}
+                          className="text-[10px] px-2 py-0.5 rounded-full border border-white/5 hover:border-white/20 transition-colors text-[var(--text-secondary)]"
+                        >
+                          {tag} <span className="text-[var(--text-muted)]">({count})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {activeNote.frontmatter?.created && (
-            <span className="text-[10px] text-gray-600 shrink-0 hidden sm:inline">
-              {new Date(activeNote.frontmatter.updated || activeNote.frontmatter.created).toLocaleDateString()}
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {wordCount > 0 && (
+              <span className="text-[10px] text-gray-600 hidden sm:inline">{wordCount}w</span>
+            )}
+            {activeNote.frontmatter?.created && (
+              <span className="text-[10px] text-gray-600 shrink-0 hidden sm:inline">
+                {new Date(activeNote.frontmatter.updated || activeNote.frontmatter.created).toLocaleDateString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Split confirmation modal */}
+      {showSplitConfirm && (
+        <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 animate-fadeIn">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">✂️</span>
+            <div className="flex-1">
+              <p className="text-sm text-[var(--text-primary)] font-medium">Split into {detectSections.length} notes?</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
+                Each ## section becomes its own note, inheriting current tags and linking back to this note.
+              </p>
+              <div className="mt-2 space-y-1">
+                {detectSections.map((s, i) => (
+                  <div key={i} className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+                    <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
+                    {s.heading}
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button onClick={handleSplitNote} className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-500 font-medium">
+                  Split Note
+                </button>
+                <button onClick={() => setShowSplitConfirm(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Split result */}
+      {splitResult && (
+        <div className="border-b border-green-500/30 bg-green-500/5 px-4 py-3 animate-fadeIn">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">✅</span>
+            <div className="flex-1">
+              <p className="text-sm text-[var(--text-primary)] font-medium">Split complete</p>
+              <div className="mt-1 space-y-1">
+                {splitResult.map((r, i) => (
+                  <div key={i} className="text-xs flex items-center gap-1.5">
+                    {r.status === 'created' ? (
+                      <button onClick={() => setActiveNote(r.filename)} className="text-[var(--accent)] hover:underline">{r.title}</button>
+                    ) : r.status === 'exists' ? (
+                      <span className="text-[var(--text-muted)]">{r.title} (already exists)</span>
+                    ) : (
+                      <span className="text-red-400">{r.title} (error)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setSplitResult(null)} className="text-xs text-gray-400 hover:text-gray-200 mt-2">&times; Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Editor / Preview — stacked on mobile, side-by-side on desktop */}
       <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">

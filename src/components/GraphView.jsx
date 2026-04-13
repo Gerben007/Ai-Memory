@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import { useStore } from '../lib/store'
 import { extractWikilinks } from '../lib/wikilinkParser'
 import { renderMarkdown } from '../lib/markdownParser'
+import { getTagColor } from '../lib/tagUtils'
 
 const REPULSION = 12000
 const SPRING_STRENGTH = 0.015
@@ -11,23 +12,6 @@ const DAMPING = 0.78
 const INITIAL_TEMP = 1.0
 const COOLING = 0.998
 const MIN_TEMP = 0.003
-
-const TAG_PALETTE = [
-  '#818cf8', '#f472b6', '#34d399', '#fbbf24', '#60a5fa',
-  '#a78bfa', '#fb923c', '#2dd4bf', '#f87171', '#a3e635',
-  '#e879f9', '#67e8f9', '#fca5a5', '#bef264'
-]
-
-function hashCode(str) {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0 }
-  return Math.abs(hash)
-}
-
-function getTagColor(tag) {
-  if (!tag) return '#64748b'
-  return TAG_PALETTE[hashCode(tag) % TAG_PALETTE.length]
-}
 
 function getTags(note) {
   if (note.frontmatter?.tags && Array.isArray(note.frontmatter.tags) && note.frontmatter.tags.length > 0) return note.frontmatter.tags

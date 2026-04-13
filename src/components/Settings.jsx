@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../lib/store'
+import { getAllTagsWithCounts } from '../lib/tagUtils'
+import TagCleanup from './TagCleanup'
 import JSZip from 'jszip'
 
 export default function Settings() {
@@ -13,6 +15,9 @@ export default function Settings() {
   const [showKey, setShowKey] = useState(false)
   const [keyStatus, setKeyStatus] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
+  const [showTagCleanup, setShowTagCleanup] = useState(false)
+
+  const tagCount = getAllTagsWithCounts(notes).size
 
   const stats = bm25Index.getStats()
 
@@ -172,6 +177,14 @@ export default function Settings() {
           <h3 className="text-sm font-semibold text-gray-300 mb-3">Actions</h3>
           <div className="space-y-3">
             <button
+              onClick={() => setShowTagCleanup(true)}
+              className="w-full text-left text-sm bg-gray-800 text-gray-300 px-4 py-3 rounded-lg hover:bg-gray-700 border border-gray-700"
+            >
+              <div className="font-medium">🏷 Clean Up Tags</div>
+              <div className="text-xs text-gray-500 mt-0.5">Normalize, merge duplicates, remove orphan tags ({tagCount} tags)</div>
+            </button>
+
+            <button
               onClick={handleExportZip}
               disabled={notes.length === 0}
               className="w-full text-left text-sm bg-gray-800 text-gray-300 px-4 py-3 rounded-lg hover:bg-gray-700 border border-gray-700 disabled:opacity-50"
@@ -207,6 +220,8 @@ export default function Settings() {
           </div>
         </section>
       </div>
+
+      {showTagCleanup && <TagCleanup onClose={() => setShowTagCleanup(false)} />}
     </div>
   )
 }

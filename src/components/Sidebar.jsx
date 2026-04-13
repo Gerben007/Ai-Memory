@@ -1,20 +1,6 @@
 import { useState } from 'react'
 import { useStore, TEMPLATES } from '../lib/store'
-
-const TAG_PALETTE = [
-  '#818cf8', '#f472b6', '#34d399', '#fbbf24', '#60a5fa',
-  '#a78bfa', '#fb923c', '#2dd4bf', '#f87171', '#a3e635'
-]
-
-function hashCode(str) {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0 }
-  return Math.abs(hash)
-}
-
-function getTagColor(tag) {
-  return TAG_PALETTE[hashCode(tag) % TAG_PALETTE.length]
-}
+import { getTagColor } from '../lib/tagUtils'
 
 const NAV_ITEMS = [
   { key: 'editor', label: 'Notes', icon: '📝' },
