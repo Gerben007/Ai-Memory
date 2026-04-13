@@ -219,6 +219,72 @@ server.tool(
   }
 )
 
+// ── Tool: Quick capture ─────────────────────────────────────────────────
+
+server.tool(
+  'vault_quick_capture',
+  'Quickly capture a thought, idea, or note. Appends to today\'s daily note with a timestamp. Creates the daily note if it doesn\'t exist.',
+  { text: z.string().describe('The thought or idea to capture') },
+  async ({ text }) => {
+    const d = new Date()
+    const slug = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const filename = `daily-${slug}.md`
+    const timestamp = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+
+    // Check if daily note exists
+    let existing = null
+    try { existing = await vaultFetch(`/api/notes/${encodeURIComponent(filename)}`) } catch {}
+
+    if (!existing) {
+      const now = d.toISOString()
+      const content = `---\ntitle: "Daily Note — ${slug}"\ntags: [daily]\ncreated: ${now}\nupdated: ${now}\n---\n\n## What's on my mind\n\n\n\n## Tasks\n\n- [ ] \n\n## Ideas\n\n\n\n## Notes\n\n- **${timestamp}** — ${text}`
+      await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: content })
+    } else {
+      const newContent = existing.content + `\n- **${timestamp}** — ${text}`
+      await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: newContent })
+    }
+
+    return { content: [{ type: 'text', text: `Captured to daily note (${slug}): "${text}"` }] }
+  }
+)
+
+// ── Tool: Daily note ────────────────────────────────────────────────────
+
+server.tool(
+  'vault_daily_note',
+  'Get or create today\'s daily note. Returns the content if it exists, or creates a fresh one.',
+  {},
+  async () => {
+    const d = new Date()
+    const slug = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const filename = `daily-${slug}.md`
+
+    try {
+      const note = await vaultFetch(`/api/notes/${encodeURIComponent(filename)}`)
+      return { content: [{ type: 'text', text: `Daily note for ${slug}:\n\n${note.content}` }] }
+    } catch {
+      const now = d.toISOString()
+      const content = `---\ntitle: "Daily Note — ${slug}"\ntags: [daily]\ncreated: ${now}\nupdated: ${now}\n---\n\n## What's on my mind\n\n\n\n## Tasks\n\n- [ ] \n\n## Ideas\n\n\n\n## Notes\n\n`
+      await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: content })
+      return { content: [{ type: 'text', text: `Created new daily note for ${slug}` }] }
+    }
+  }
+)
+
+// ── Tool: Random note ───────────────────────────────────────────────────
+
+server.tool(
+  'vault_random_note',
+  'Get a random note from the vault for serendipitous discovery. Great for sparking new connections.',
+  {},
+  async () => {
+    const notes = await vaultFetch('/api/notes')
+    if (notes.length === 0) return { content: [{ type: 'text', text: 'Vault is empty — no notes to show.' }] }
+    const note = notes[Math.floor(Math.random() * notes.length)]
+    return { content: [{ type: 'text', text: `Random note: ${note.filename}\n\n${note.content}` }] }
+  }
+)
+
 // ── Start ───────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport()

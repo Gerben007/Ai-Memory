@@ -16,8 +16,76 @@ function parseFrontmatter(content) {
   }
 }
 
+function todaySlug() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export const TEMPLATES = {
+  daily: {
+    label: 'Daily Note',
+    icon: '📅',
+    create: () => {
+      const slug = todaySlug()
+      const now = new Date().toISOString()
+      const title = `Daily Note — ${slug}`
+      return {
+        filename: `daily-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [daily]\ncreated: ${now}\nupdated: ${now}\n---\n\n## What's on my mind\n\n\n\n## Tasks\n\n- [ ] \n\n## Ideas\n\n\n\n## Notes\n\n`
+      }
+    }
+  },
+  meeting: {
+    label: 'Meeting Notes',
+    icon: '🤝',
+    create: (title) => {
+      const now = new Date().toISOString()
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      return {
+        filename: `meeting-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [meeting]\ncreated: ${now}\nupdated: ${now}\n---\n\n## Attendees\n\n- \n\n## Agenda\n\n1. \n\n## Discussion\n\n\n\n## Action Items\n\n- [ ] \n\n## Key Decisions\n\n`
+      }
+    }
+  },
+  idea: {
+    label: 'Project Idea',
+    icon: '💡',
+    create: (title) => {
+      const now = new Date().toISOString()
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      return {
+        filename: `idea-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [idea]\ncreated: ${now}\nupdated: ${now}\n---\n\n## The Problem\n\nWhat problem does this solve?\n\n## The Idea\n\n\n\n## Why Now?\n\nWhy is this the right time?\n\n## Target Audience\n\n\n\n## Key Features\n\n- \n\n## Open Questions\n\n- \n\n## Related Notes\n\n`
+      }
+    }
+  },
+  book: {
+    label: 'Book Summary',
+    icon: '📚',
+    create: (title) => {
+      const now = new Date().toISOString()
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      return {
+        filename: `book-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [book]\ncreated: ${now}\nupdated: ${now}\n---\n\n## Key Takeaways\n\n1. \n\n## Summary\n\n\n\n## Favorite Quotes\n\n> \n\n## How This Applies to Me\n\n\n\n## Related Notes\n\n`
+      }
+    }
+  },
+  research: {
+    label: 'Research Log',
+    icon: '🔬',
+    create: (title) => {
+      const now = new Date().toISOString()
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
+      return {
+        filename: `research-${slug}.md`,
+        content: `---\ntitle: "${title}"\ntags: [research]\ncreated: ${now}\nupdated: ${now}\n---\n\n## Research Question\n\n\n\n## Sources\n\n- \n\n## Findings\n\n\n\n## Analysis\n\n\n\n## Next Steps\n\n- \n\n## Related Notes\n\n`
+      }
+    }
+  }
+}
+
 export const useStore = create((set, get) => ({
-  // Notes
   notes: [],
   activeNoteFilename: null,
   initialized: false,
@@ -43,11 +111,7 @@ export const useStore = create((set, get) => ({
       await api.saveNote(filename, content)
       const { frontmatter, body } = parseFrontmatter(content)
       set(state => ({
-        notes: state.notes.map(n =>
-          n.filename === filename
-            ? { ...n, content, body, frontmatter }
-            : n
-        )
+        notes: state.notes.map(n => n.filename === filename ? { ...n, content, body, frontmatter } : n)
       }))
       get().rebuildIndex()
     } catch (err) {
@@ -56,29 +120,68 @@ export const useStore = create((set, get) => ({
   },
 
   createNote: async (title) => {
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
+    const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
     const filename = `${slug}.md`
-
     const now = new Date().toISOString()
     const content = `---\ntitle: "${title}"\ntags: []\ncreated: ${now}\nupdated: ${now}\n---\n\n`
-
     try {
       await api.saveNote(filename, content)
       const { frontmatter, body } = parseFrontmatter(content)
-      set(state => ({
-        notes: [...state.notes, { filename, content, body, frontmatter }],
-        activeNoteFilename: filename,
-        activeView: 'editor'
-      }))
+      set(state => ({ notes: [...state.notes, { filename, content, body, frontmatter }], activeNoteFilename: filename, activeView: 'editor' }))
       get().rebuildIndex()
-    } catch (err) {
-      console.error('Failed to create note:', err)
+    } catch (err) { console.error('Failed to create note:', err) }
+  },
+
+  createFromTemplate: async (templateKey, title) => {
+    const template = TEMPLATES[templateKey]
+    if (!template) return
+    const { filename, content } = templateKey === 'daily' ? template.create() : template.create(title || 'Untitled')
+    // Check if already exists (for daily notes)
+    const existing = get().notes.find(n => n.filename === filename)
+    if (existing) {
+      set({ activeNoteFilename: filename, activeView: 'editor' })
+      return
     }
+    try {
+      await api.saveNote(filename, content)
+      const { frontmatter, body } = parseFrontmatter(content)
+      set(state => ({ notes: [...state.notes, { filename, content, body, frontmatter }], activeNoteFilename: filename, activeView: 'editor' }))
+      get().rebuildIndex()
+    } catch (err) { console.error('Failed to create from template:', err) }
+  },
+
+  // Quick capture — appends to today's daily note
+  quickCapture: async (text) => {
+    const slug = todaySlug()
+    const filename = `daily-${slug}.md`
+    let note = get().notes.find(n => n.filename === filename)
+
+    if (!note) {
+      // Create daily note first
+      const { filename: fn, content } = TEMPLATES.daily.create()
+      await api.saveNote(fn, content)
+      const { frontmatter, body } = parseFrontmatter(content)
+      note = { filename: fn, content, body, frontmatter }
+      set(state => ({ notes: [...state.notes, note] }))
+    }
+
+    // Append quick capture
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    const appendText = `\n- **${timestamp}** — ${text}`
+    const newContent = note.content + appendText
+    await api.saveNote(filename, newContent)
+    const { frontmatter, body } = parseFrontmatter(newContent)
+    set(state => ({
+      notes: state.notes.map(n => n.filename === filename ? { ...n, content: newContent, body, frontmatter } : n)
+    }))
+    get().rebuildIndex()
+  },
+
+  // Random note
+  getRandomNote: () => {
+    const { notes } = get()
+    if (notes.length === 0) return null
+    return notes[Math.floor(Math.random() * notes.length)]
   },
 
   deleteNote: async (filename) => {
@@ -86,15 +189,11 @@ export const useStore = create((set, get) => ({
       await api.deleteNote(filename)
       set(state => {
         const notes = state.notes.filter(n => n.filename !== filename)
-        const activeNoteFilename = state.activeNoteFilename === filename
-          ? (notes.length > 0 ? notes[0].filename : null)
-          : state.activeNoteFilename
+        const activeNoteFilename = state.activeNoteFilename === filename ? (notes.length > 0 ? notes[0].filename : null) : state.activeNoteFilename
         return { notes, activeNoteFilename }
       })
       get().rebuildIndex()
-    } catch (err) {
-      console.error('Failed to delete note:', err)
-    }
+    } catch (err) { console.error('Failed to delete note:', err) }
   },
 
   // BM25
@@ -128,10 +227,7 @@ export const useStore = create((set, get) => ({
     set(state => {
       const chatMessages = [...state.chatMessages]
       if (chatMessages.length > 0) {
-        chatMessages[chatMessages.length - 1] = {
-          ...chatMessages[chatMessages.length - 1],
-          ...updates
-        }
+        chatMessages[chatMessages.length - 1] = { ...chatMessages[chatMessages.length - 1], ...updates }
         localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages))
       }
       return { chatMessages }
