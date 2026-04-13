@@ -40,8 +40,18 @@ export async function chatCompletion(body, apiKey) {
     body: JSON.stringify(body)
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Chat request failed' }))
-    throw new Error(err.error || 'Chat request failed')
+    let errMsg = `API error (${res.status})`
+    try {
+      const text = await res.text()
+      // Try to parse as JSON
+      try {
+        const json = JSON.parse(text)
+        errMsg = json.error?.message || json.error || json.message || text
+      } catch {
+        errMsg = text || errMsg
+      }
+    } catch {}
+    throw new Error(errMsg)
   }
   return res
 }
