@@ -13,6 +13,12 @@ const INITIAL_TEMP = 1.0
 const COOLING = 0.998
 const MIN_TEMP = 0.003
 
+function hashCode(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) { hash = ((hash << 5) - hash) + str.charCodeAt(i); hash |= 0 }
+  return Math.abs(hash)
+}
+
 function getTags(note) {
   if (note.frontmatter?.tags && Array.isArray(note.frontmatter.tags) && note.frontmatter.tags.length > 0) return note.frontmatter.tags
   const raw = note.content || ''
@@ -29,13 +35,23 @@ function getTitle(note) {
   return note.filename.replace(/\.md$/, '').replace(/-/g, ' ')
 }
 
+// How many days ago was a note last edited? Returns 0..1 where 1 = now, 0 = 30+ days ago
+function getRecency(note) {
+  const updated = note.frontmatter?.updated || note.frontmatter?.created
+  if (!updated) return 0
+  const daysSince = (Date.now() - new Date(updated).getTime()) / (1000 * 60 * 60 * 24)
+  return Math.max(0, Math.min(1, 1 - daysSince / 30))
+}
+
 function buildGraphData(notes) {
   const nodes = notes.map(note => {
-    const wordCount = (note.body || note.content || '').split(/\s+/).filter(Boolean).length
     const tags = getTags(note)
+    const recency = getRecency(note)
     return {
-      id: note.filename, title: getTitle(note), tags, primaryTag: tags[0] || null, wordCount,
-      radius: Math.max(10, Math.min(32, Math.sqrt(wordCount) * 0.8 + 4)),
+      id: note.filename, title: getTitle(note), tags, primaryTag: tags[0] || null,
+      connections: 0, // computed after edges are built
+      recency,
+      radius: 12, // placeholder, sized after connection count
       color: getTagColor(tags[0]), x: 0, y: 0, vx: 0, vy: 0
     }
   })
@@ -68,6 +84,18 @@ function buildGraphData(notes) {
         if (!tagEdgeSet.has(key)) { tagEdgeSet.add(key); edges.push({ source: notes[i].filename, target: notes[j].filename, type: 'tag', weight: shared.length, sharedTags: shared }) }
       }
     }
+  }
+
+  // Count connections per node and size by connection count
+  const connCounts = new Map()
+  for (const e of edges) {
+    connCounts.set(e.source, (connCounts.get(e.source) || 0) + 1)
+    connCounts.set(e.target, (connCounts.get(e.target) || 0) + 1)
+  }
+  for (const node of nodes) {
+    node.connections = connCounts.get(node.id) || 0
+    // Size: 8px for isolated nodes, scales up with connections, max 36px for hubs
+    node.radius = Math.max(8, Math.min(36, 8 + Math.sqrt(node.connections) * 6))
   }
 
   const allTags = new Set()
@@ -174,10 +202,12 @@ function GraphLegend({ allTags, selectedTag, onSelectTag }) {
         )}
       </div>
 
-      {/* Edge legend */}
+      {/* Visual legend */}
       <div className="px-2 pb-2 pt-1 border-t border-gray-800 space-y-1 text-[10px] text-gray-500">
         <div className="flex items-center gap-2"><span className="w-4 h-0.5 bg-indigo-500 inline-block rounded" /> Wikilink</div>
         <div className="flex items-center gap-2"><span className="w-4 h-0 inline-block border-t border-dashed border-pink-400" /> Shared tag</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-400" /><span className="inline-block w-3 h-3 rounded-full bg-gray-400" /> Size = connections</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_6px_2px_rgba(129,140,248,0.5)]" /> Glow = recent</div>
         {selectedTag && (
           <button onClick={() => onSelectTag(null)} className="text-indigo-400 hover:text-indigo-300 mt-1">Clear filter</button>
         )}
@@ -331,18 +361,36 @@ export default function GraphView() {
       }
 
       // Nodes
+      const now = Date.now()
       for (const node of nodes) {
         const isHovered = hoverId === node.id
         const matches = matchesFilter(node)
         const dimmed = filterTag && !matches && !isHovered
 
         const r = isHovered ? node.radius * 1.15 : node.radius
-        const grad = ctx.createRadialGradient(node.x - r * 0.25, node.y - r * 0.25, r * 0.1, node.x, node.y, r)
 
+        // Recency glow — recent notes pulse, old notes are dim
+        const recency = node.recency
+        if (!dimmed && recency > 0.1) {
+          // Animated pulse: subtle breathing effect for recent notes
+          const pulse = 0.5 + 0.5 * Math.sin(now / 800 + hashCode(node.id) * 0.5)
+          const glowIntensity = recency * (0.6 + pulse * 0.4)
+          const glowRadius = r + 6 + recency * 12
+          ctx.shadowColor = node.color
+          ctx.shadowBlur = glowIntensity * 25
+          ctx.globalAlpha = glowIntensity * 0.35
+          ctx.fillStyle = node.color
+          ctx.beginPath(); ctx.arc(node.x, node.y, glowRadius, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 1
+          ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
+        }
+
+        // Node body
+        const grad = ctx.createRadialGradient(node.x - r * 0.25, node.y - r * 0.25, r * 0.1, node.x, node.y, r)
         if (dimmed) {
           grad.addColorStop(0, '#334155'); grad.addColorStop(1, '#1e293b')
         } else {
-          if (isHovered) { ctx.shadowColor = node.color; ctx.shadowBlur = 25 }
+          if (isHovered) { ctx.shadowColor = node.color; ctx.shadowBlur = 30 }
           grad.addColorStop(0, node.color); grad.addColorStop(1, node.color + '88')
         }
 
@@ -351,8 +399,8 @@ export default function GraphView() {
         ctx.lineWidth = isHovered ? 2 : 1; ctx.stroke()
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
 
-        // Label — hover OR matching filter
-        if (isHovered || (filterTag && matches)) {
+        // Label — hover OR matching filter OR hub nodes (5+ connections)
+        if (isHovered || (filterTag && matches) || node.connections >= 5) {
           ctx.fillStyle = isHovered ? '#f1f5f9' : '#94a3b8'
           ctx.font = `${isHovered ? 'bold ' : ''}${isHovered ? 13 : 11}px system-ui, sans-serif`
           ctx.textAlign = 'center'; ctx.fillText(node.title, node.x, node.y + r + 16)
@@ -365,17 +413,18 @@ export default function GraphView() {
         if (node) {
           const tx = node.x + node.radius + 14, ty = node.y - 30
           const tagText = node.tags.length > 0 ? node.tags.join(', ') : 'untagged'
-          const wordText = `${node.wordCount} words`
+          const connText = `${node.connections} connection${node.connections !== 1 ? 's' : ''}`
+          const recencyText = node.recency > 0.8 ? 'Active now' : node.recency > 0.5 ? 'Recent' : node.recency > 0.2 ? 'This month' : 'Older'
           ctx.font = 'bold 13px system-ui, sans-serif'
           const tw = ctx.measureText(node.title).width
           ctx.font = '11px system-ui, sans-serif'
-          const boxW = Math.max(tw, ctx.measureText(tagText).width, ctx.measureText(wordText).width) + 28
+          const boxW = Math.max(tw, ctx.measureText(tagText).width, ctx.measureText(`${connText}  ·  ${recencyText}`).width) + 28
           ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.strokeStyle = node.color + '50'; ctx.lineWidth = 1
           ctx.beginPath(); ctx.roundRect(tx, ty, boxW, 64, 8); ctx.fill(); ctx.stroke()
           ctx.textAlign = 'left'; ctx.fillStyle = '#f1f5f9'; ctx.font = 'bold 13px system-ui, sans-serif'
           ctx.fillText(node.title, tx + 14, ty + 20)
           ctx.fillStyle = node.color; ctx.font = '11px system-ui, sans-serif'; ctx.fillText(tagText, tx + 14, ty + 38)
-          ctx.fillStyle = '#64748b'; ctx.fillText(wordText, tx + 14, ty + 54)
+          ctx.fillStyle = '#64748b'; ctx.fillText(`${connText}  ·  ${recencyText}`, tx + 14, ty + 54)
         }
       }
 
