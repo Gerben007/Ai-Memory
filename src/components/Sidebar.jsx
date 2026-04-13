@@ -87,15 +87,15 @@ export default function Sidebar({ onNavigate }) {
   const handleDelete = (filename) => { deleteNote(filename); setConfirmDelete(null) }
 
   return (
-    <aside className="w-full h-full bg-gray-900 border-r border-gray-800 flex flex-col">
+    <aside className="w-full h-full bg-[var(--bg-secondary)] border-r border-white/5 flex flex-col relative z-10">
       {/* Header */}
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-lg font-bold text-indigo-400">Knowledge Vault</h1>
-        <p className="text-[10px] text-gray-500 mt-0.5">{notes.length} notes</p>
+      <div className="p-4 border-b border-white/5">
+        <h1 className="text-lg font-bold text-gradient">Knowledge Vault</h1>
+        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{notes.length} notes</p>
       </div>
 
       {/* Quick Capture */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-white/5">
         <div className="flex gap-1.5">
           <input
             type="text"
@@ -103,9 +103,9 @@ export default function Sidebar({ onNavigate }) {
             onChange={e => setQuickText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleQuickCapture()}
             placeholder="Quick capture..."
-            className="flex-1 bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-amber-500 focus:outline-none placeholder-gray-500"
+            className="flex-1 input-glass text-xs"
           />
-          <button onClick={handleQuickCapture} className="text-xs bg-amber-600 text-white px-2.5 py-2 rounded-lg hover:bg-amber-500 shrink-0">
+          <button onClick={handleQuickCapture} className="btn-primary text-xs px-2.5 py-2 shrink-0">
             +
           </button>
         </div>
@@ -113,34 +113,34 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       {/* Action buttons */}
-      <div className="p-3 border-b border-gray-800 flex gap-2">
+      <div className="p-3 border-b border-white/5 flex gap-2">
         <button
           onClick={() => createFromTemplate('daily')}
-          className="flex-1 text-[11px] bg-gray-800 text-gray-300 py-2 rounded-lg hover:bg-gray-700 border border-gray-700 flex items-center justify-center gap-1"
+          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
         >
           📅 Today
         </button>
         <button
           onClick={handleRandom}
-          className="flex-1 text-[11px] bg-gray-800 text-gray-300 py-2 rounded-lg hover:bg-gray-700 border border-gray-700 flex items-center justify-center gap-1"
+          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
         >
           🎲 Random
         </button>
       </div>
 
       {/* Search */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-white/5">
         <input
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Search notes..."
-          className="w-full bg-gray-800 text-gray-200 text-sm rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+          className="w-full input-glass text-sm"
         />
       </div>
 
       {/* New Note / Templates */}
-      <div className="p-3 border-b border-gray-800">
+      <div className="p-3 border-b border-white/5">
         {templateKey ? (
           <div className="space-y-2">
             <div className="text-[10px] text-gray-500 uppercase tracking-wider">{TEMPLATES[templateKey].icon} {TEMPLATES[templateKey].label}</div>
@@ -151,7 +151,7 @@ export default function Sidebar({ onNavigate }) {
                 onChange={e => setTemplateTitle(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleTemplateCreate()}
                 placeholder="Title..."
-                className="w-full bg-gray-800 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+                className="w-full input-glass text-sm py-1.5"
                 autoFocus
               />
             )}
@@ -166,7 +166,7 @@ export default function Sidebar({ onNavigate }) {
               <button
                 key={key}
                 onClick={() => { if (key === 'daily') { createFromTemplate('daily'); setShowTemplates(false); onNavigate?.() } else { setTemplateKey(key) } }}
-                className="w-full text-left text-xs bg-gray-800 text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-700 flex items-center gap-2"
+                className="w-full text-left text-xs btn-secondary px-3 py-2 flex items-center gap-2"
               >
                 <span>{tmpl.icon}</span><span>{tmpl.label}</span>
               </button>
@@ -178,18 +178,18 @@ export default function Sidebar({ onNavigate }) {
             <input
               type="text" value={newNoteTitle} onChange={e => setNewNoteTitle(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="Note title..."
-              className="flex-1 bg-gray-800 text-gray-200 text-sm rounded-lg px-3 py-1.5 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+              className="flex-1 input-glass text-sm py-1.5"
               autoFocus
             />
-            <button onClick={handleCreate} className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-500">Add</button>
+            <button onClick={handleCreate} className="btn-primary text-sm">Add</button>
             <button onClick={() => { setShowNewNote(false); setNewNoteTitle('') }} className="text-sm text-gray-400 hover:text-gray-200 px-1">&times;</button>
           </div>
         ) : (
           <div className="flex gap-2">
-            <button onClick={() => setShowNewNote(true)} className="flex-1 text-xs bg-gray-800 text-gray-300 py-2 rounded-lg hover:bg-gray-700 border border-gray-700 border-dashed">
+            <button onClick={() => setShowNewNote(true)} className="flex-1 text-xs btn-secondary py-2 border-dashed">
               + New Note
             </button>
-            <button onClick={() => setShowTemplates(true)} className="text-xs bg-gray-800 text-gray-300 px-3 py-2 rounded-lg hover:bg-gray-700 border border-gray-700">
+            <button onClick={() => setShowTemplates(true)} className="text-xs btn-secondary px-3 py-2">
               📋
             </button>
           </div>
@@ -204,8 +204,8 @@ export default function Sidebar({ onNavigate }) {
           displayedNotes.map(note => (
             <div
               key={note.filename}
-              className={`group relative px-4 py-3 cursor-pointer border-b border-gray-800/50 hover:bg-gray-800/50 active:bg-gray-800 ${
-                activeNoteFilename === note.filename && activeView === 'editor' ? 'bg-gray-800 border-l-2 border-l-indigo-500' : ''
+              className={`group relative px-4 py-3 cursor-pointer border-b border-white/5/50 hover:bg-white/[0.03] active:bg-white/[0.05] ${
+                activeNoteFilename === note.filename && activeView === 'editor' ? 'bg-[var(--accent-soft)] border-l-2 border-l-[var(--accent)]' : ''
               }`}
               onClick={() => handleNoteClick(note.filename)}
             >
@@ -234,10 +234,10 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       {/* Desktop nav */}
-      <nav className="border-t border-gray-800 p-2 hidden md:block">
+      <nav className="border-t border-white/5 p-2 hidden md:block">
         {NAV_ITEMS.map(item => (
           <button key={item.key} onClick={() => handleNavClick(item.key)}
-            className={`w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2 ${activeView === item.key ? 'bg-indigo-600/20 text-indigo-400' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`}
+            className={`w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2 ${activeView === item.key ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-white/[0.03] hover:text-[var(--text-primary)]'}`}
           >
             <span>{item.icon}</span><span>{item.label}</span>
           </button>

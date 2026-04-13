@@ -39,14 +39,14 @@ export default function App() {
 
   if (!initialized) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-gray-950">
-        <div className="text-gray-400 text-lg">Loading Knowledge Vault...</div>
+      <div className="h-dvh flex items-center justify-center app-bg">
+        <div className="text-gradient text-2xl font-bold">Knowledge Vault</div>
       </div>
     )
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
+    <div className="h-dvh flex flex-col app-bg text-gray-100 overflow-hidden">
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`
           fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-200 ease-out
@@ -61,11 +61,11 @@ export default function App() {
         )}
 
         <main className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/80 md:hidden">
-            <button onClick={() => setSidebarOpen(true)} className="text-gray-400 hover:text-gray-200 p-1">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 glass-strong md:hidden">
+            <button onClick={() => setSidebarOpen(true)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
             </button>
-            <span className="text-sm font-semibold text-indigo-400">Knowledge Vault</span>
+            <span className="text-sm font-semibold text-gradient">Knowledge Vault</span>
             <div className="w-7" />
           </div>
 
@@ -80,17 +80,18 @@ export default function App() {
         </main>
       </div>
 
-      <nav className="flex border-t border-gray-800 bg-gray-900 md:hidden shrink-0">
+      <nav className="flex border-t border-white/5 glass-strong md:hidden shrink-0 relative z-10">
         {NAV_ITEMS.map(item => (
           <button
             key={item.key}
             onClick={() => handleNavClick(item.key)}
-            className={`flex-1 flex flex-col items-center py-2 text-[10px] gap-0.5 ${
-              activeView === item.key ? 'text-indigo-400' : 'text-gray-500'
+            className={`flex-1 flex flex-col items-center py-2.5 text-[10px] gap-0.5 transition-colors ${
+              activeView === item.key ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
             }`}
           >
             <span className="text-base">{item.icon}</span>
             <span>{item.label}</span>
+            {activeView === item.key && <span className="w-1 h-1 rounded-full bg-[var(--accent)] mt-0.5" />}
           </button>
         ))}
       </nav>
