@@ -84,49 +84,22 @@ export default function ChatPanel() {
 
     setLoading(true)
     try {
-      let res
-      try {
-        res = await chatCompletion({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: systemPrompt, messages: recentMessages, stream: true }, apiKey)
-      } catch (streamErr) {
-        // Retry without streaming
-        updateLastMessage({ content: 'API busy, retrying...' })
-        await new Promise(r => setTimeout(r, 2000))
-        res = await chatCompletion({ model: 'claude-sonnet-4-20250514', max_tokens: 1024, system: systemPrompt, messages: recentMessages, stream: false }, apiKey)
+      const res = await chatCompletion({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: recentMessages,
+        stream: false
+      }, apiKey)
+
+      const data = await res.json()
+      let fullContent = data.content?.[0]?.text
+
+      if (!fullContent && data.error) {
+        fullContent = `API Error: ${data.error.message || JSON.stringify(data.error)}`
       }
 
-      const contentType = res.headers.get('content-type') || ''
-      let fullContent = ''
-
-      if (contentType.includes('text/event-stream')) {
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') continue
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  fullContent += parsed.delta.text
-                  updateLastMessage({ content: fullContent })
-                }
-              } catch {}
-            }
-          }
-        }
-      } else {
-        const data = await res.json()
-        fullContent = data.content?.[0]?.text || 'No response received.'
-      }
-
-      updateLastMessage({ content: fullContent || 'No response — API may be overloaded. Try again.', sources })
+      updateLastMessage({ content: fullContent || 'No response — try again.', sources })
     } catch (err) {
       updateLastMessage({
         content: `Error: ${err.message}`,

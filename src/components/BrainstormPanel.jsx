@@ -192,66 +192,24 @@ export default function BrainstormPanel() {
                 ? 'Challenge the key assumptions and ideas in my vault.'
                 : 'Help me think.'
 
-    // Try streaming first, fall back to non-streaming on error
-    const callAPI = async (stream) => {
+    try {
       const res = await chatCompletion({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
-        stream
+        stream: false
       }, apiKey)
-      return res
-    }
 
-    try {
-      let res
-      try {
-        res = await callAPI(true)
-      } catch (streamErr) {
-        // If streaming fails (e.g. overloaded), retry without streaming
-        console.warn('Streaming failed, retrying without stream:', streamErr.message)
-        setResponse('API busy, retrying...')
-        await new Promise(r => setTimeout(r, 2000))
-        res = await callAPI(false)
-      }
+      const data = await res.json()
+      const text = data.content?.[0]?.text
 
-      const contentType = res.headers.get('content-type') || ''
-
-      if (contentType.includes('text/event-stream')) {
-        // Streaming response
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let full = ''
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') continue
-              try {
-                const parsed = JSON.parse(data)
-                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                  full += parsed.delta.text
-                  setResponse(full)
-                }
-              } catch {}
-            }
-          }
-        }
-        if (full) setResponse(full)
-        else setResponse('No response received. The API may be overloaded — try again in a moment.')
-      } else {
-        // Non-streaming JSON response
-        const data = await res.json()
-        const text = data.content?.[0]?.text || JSON.stringify(data)
+      if (text) {
         setResponse(text)
+      } else if (data.error) {
+        setResponse(`**API Error:** ${data.error.message || JSON.stringify(data.error)}\n\nTry again in a moment.`)
+      } else {
+        setResponse('No response received. Try clicking **Regenerate**.')
       }
     } catch (err) {
       setResponse(`**Error:** ${err.message}\n\nThe Anthropic API may be overloaded. Wait a moment and click **Regenerate** or **Go** to try again.`)
