@@ -379,6 +379,15 @@ body {
   color: var(--text-secondary);
 }
 
+/* ── Hover glow — apply to any interactive card ──────────────────────────── */
+.hover-glow {
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.1), 0 0 36px rgba(59, 130, 246, 0.05);
+  border-color: var(--border-hover) !important;
+}
+
 /* ── Section divider ────────────────────────────────────────────────────── */
 .section-label {
   font-size: 9.5px;

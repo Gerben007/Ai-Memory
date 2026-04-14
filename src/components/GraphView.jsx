@@ -6,15 +6,16 @@ import { renderMarkdown } from '../lib/markdownParser'
 import { getTagColor, getTags } from '../lib/tagUtils'
 
 // Physics constants are scaled by screen size in the simulation loop
-const BASE_REPULSION = 12000
-const BASE_SPRING_STRENGTH = 0.015
-const BASE_IDEAL_LENGTH = 280
+const BASE_REPULSION = 25000
+const BASE_SPRING_STRENGTH = 0.008
+const BASE_IDEAL_LENGTH = 350
 const GRAVITY = 0       // no center pull — nodes float freely
-const DAMPING = 0.85
-const INITIAL_TEMP = 1.0
-const COOLING = 0.997
+const DAMPING = 0.88
+const INITIAL_TEMP = 0.8
+const COOLING = 0.995
 const MIN_TEMP = 0.01
-const DRIFT = 0.03      // very gentle drift — barely perceptible floating
+const DRIFT = 0.008     // barely perceptible floating
+const MAX_VEL = 4        // cap velocity to prevent shooting
 
 function hashCode(str) {
   let hash = 0
@@ -90,8 +91,8 @@ function buildGraphData(notes) {
   for (const node of nodes) {
     node.connections = connCounts.get(node.id) || 0
     // Size: 8px for isolated nodes, scales up with connections, max 36px for hubs
-    // Scale down as vault grows — log dampens growth for large connection counts
-    node.radius = Math.max(5, Math.min(22, 5 + Math.log2(node.connections + 1) * 4))
+    // sqrt scale: 0→4px, 1→7px, 4→10px, 16→16px, 55→22px (visible range)
+    node.radius = Math.max(4, Math.min(22, 4 + Math.sqrt(node.connections) * 2.8))
   }
 
   // Count notes per tag, sorted by usage
@@ -341,8 +342,10 @@ export default function GraphView() {
       const IDEAL_LENGTH = BASE_IDEAL_LENGTH * Math.max(0.4, screenScale)
 
       if (nodes.length > 0) {
-        // Physics forces only while settling (temp > MIN_TEMP)
-        if (temp > MIN_TEMP) {
+        const settling = temp > MIN_TEMP
+
+        if (settling) {
+          // Repulsion
           for (let i = 0; i < nodes.length; i++) {
             for (let j = i + 1; j < nodes.length; j++) {
               const a = nodes[i], b = nodes[j]
@@ -353,6 +356,7 @@ export default function GraphView() {
               a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy
             }
           }
+          // Springs
           for (const e of edges) {
             const s = nMap.get(e.source), t = nMap.get(e.target)
             if (!s || !t) continue
@@ -360,37 +364,42 @@ export default function GraphView() {
             const f = (d - IDEAL_LENGTH) * SPRING_STRENGTH * temp
             s.vx += f * dx / d; s.vy += f * dy / d; t.vx -= f * dx / d; t.vy -= f * dy / d
           }
-        }
-        // Collision resolution — prevent overlapping (always active)
-        for (let i = 0; i < nodes.length; i++) {
-          for (let j = i + 1; j < nodes.length; j++) {
-            const a = nodes[i], b = nodes[j]
-            const dx = b.x - a.x, dy = b.y - a.y
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1
-            const minDist = a.radius + b.radius + 6 // 6px gap
-            if (dist < minDist) {
-              const push = (minDist - dist) * 0.3 / dist
-              const px = dx * push, py = dy * push
-              a.vx -= px; a.vy -= py
-              b.vx += px; b.vy += py
+          // Collision
+          for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+              const a = nodes[i], b = nodes[j]
+              const dx = b.x - a.x, dy = b.y - a.y
+              const dist = Math.sqrt(dx * dx + dy * dy) || 0.1
+              const minDist = a.radius + b.radius + 12
+              if (dist < minDist) {
+                const push = (minDist - dist) * 0.5 / dist
+                a.vx -= dx * push; a.vy -= dy * push
+                b.vx += dx * push; b.vy += dy * push
+              }
             }
           }
         }
-        // Gentle drift — always active, keeps nodes subtly alive
+
+        // Move nodes (always runs — drift keeps them subtly alive)
         for (const n of nodes) {
           if (dragRef.current?.id === n.id) continue
-          n.vx += (Math.random() - 0.5) * DRIFT
-          n.vy += (Math.random() - 0.5) * DRIFT
+          if (!settling) {
+            n.vx += (Math.random() - 0.5) * DRIFT
+            n.vy += (Math.random() - 0.5) * DRIFT
+          }
           // Soft boundary
-          const margin = 80, softness = 0.01
+          const margin = 60, softness = 0.015
           if (n.x < margin)     n.vx += (margin - n.x) * softness
           if (n.x > w - margin) n.vx -= (n.x - (w - margin)) * softness
           if (n.y < margin)     n.vy += (margin - n.y) * softness
           if (n.y > h - margin) n.vy -= (n.y - (h - margin)) * softness
           n.vx *= DAMPING; n.vy *= DAMPING
+          // Cap velocity
+          const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy)
+          if (speed > MAX_VEL) { n.vx *= MAX_VEL / speed; n.vy *= MAX_VEL / speed }
           n.x += n.vx; n.y += n.vy
         }
-        tempRef.current *= COOLING
+        if (settling) tempRef.current *= COOLING
       }
 
       // ── RENDER (futuristic) ─────────────────────────────────────────
@@ -547,9 +556,8 @@ export default function GraphView() {
 
         // Label
         const isMobile = w < 768
-        // Only show labels on hover or for top hubs (reduces clutter with many notes)
-        const hubThreshold = nodes.length > 50 ? 15 : nodes.length > 20 ? 8 : 4
-        const showLabel = isHovered || (filterTag && matches) || (!isMobile && node.connections >= hubThreshold)
+        // Labels: hover only — too many notes for auto-labels
+        const showLabel = isHovered
         if (showLabel) {
           const labelY = node.y + r + 14
           // Label background

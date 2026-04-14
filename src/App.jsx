@@ -98,7 +98,6 @@ const NAV_ITEMS = [
   { key: 'pulse',     label: 'Pulse',     icon: Icons2.pulse },
   { key: 'insights',  label: 'Insights',  icon: Icons2.insight },
   { key: 'import',    label: 'Import',    icon: Icons.import },
-  { key: 'agent',     label: 'Agent API', icon: Icons.agent },
   { key: 'settings',  label: 'Settings',  icon: Icons.settings },
 ]
 

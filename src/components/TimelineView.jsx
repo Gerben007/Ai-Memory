@@ -40,6 +40,19 @@ export default function TimelineView() {
       .sort((a, b) => b[1] - a[1])
   }, [notes])
 
+  // Extract date with regex fallback when gray-matter fails
+  const getDate = (note) => {
+    if (note.frontmatter?.created) return new Date(note.frontmatter.created)
+    if (note.frontmatter?.updated) return new Date(note.frontmatter.updated)
+    const raw = note.content || ''
+    const m = raw.match(/^(?:created|updated|date):\s*(.+)$/m)
+    if (m) {
+      const d = new Date(m[1].trim().replace(/^["']|["']$/g, ''))
+      if (!isNaN(d.getTime())) return d
+    }
+    return null
+  }
+
   // Prepare sorted and filtered notes with parsed dates
   const processedNotes = useMemo(() => {
     return notes
@@ -48,9 +61,7 @@ export default function TimelineView() {
         const body = getBody(note)
         const tags = getTags(note)
         const preview = stripMarkdown(body).slice(0, 120)
-        const created = note.frontmatter?.created
-          ? new Date(note.frontmatter.created)
-          : null
+        const created = getDate(note)
         return { note, title, body, tags, preview, created }
       })
       .filter(item => item.created !== null)

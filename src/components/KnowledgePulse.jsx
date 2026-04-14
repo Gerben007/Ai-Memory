@@ -39,6 +39,29 @@ function getDayKey(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Extract date with regex fallback when gray-matter fails
+function getNoteDate(note, field = 'created') {
+  // Try frontmatter first
+  const fm = note.frontmatter
+  if (fm?.[field]) return new Date(fm[field])
+  if (field === 'created' && fm?.updated) return new Date(fm.updated)
+  if (field === 'updated' && fm?.created) return new Date(fm.created)
+  // Regex fallback on raw content
+  const raw = note.content || ''
+  const m = raw.match(new RegExp(`^${field}:\\s*(.+)$`, 'm'))
+  if (m) {
+    const d = new Date(m[1].trim().replace(/^["']|["']$/g, ''))
+    if (!isNaN(d.getTime())) return d
+  }
+  // Try any date field
+  const any = raw.match(/^(?:created|updated|date):\s*(.+)$/m)
+  if (any) {
+    const d = new Date(any[1].trim().replace(/^["']|["']$/g, ''))
+    if (!isNaN(d.getTime())) return d
+  }
+  return null
+}
+
 // ── Shared styles ──────────────────────────────────────────────────────
 
 const cardStyle = {
@@ -101,10 +124,8 @@ export default function KnowledgePulse() {
     }
 
     for (const note of notes) {
-      const created = note.frontmatter?.created
-      if (!created) continue
-      const d = new Date(created)
-      if (isNaN(d.getTime())) continue
+      const d = getNoteDate(note, 'created')
+      if (!d) continue
       const wk = getWeekKey(d)
       const match = weeks.find(w => w.key === wk)
       if (match) match.count++
@@ -126,13 +147,11 @@ export default function KnowledgePulse() {
   // ── Recent activity (last 10 modified) ─────────────────────────────
 
   const recentNotes = useMemo(() => {
-    return [...notes]
-      .filter(n => n.frontmatter?.updated || n.frontmatter?.created)
-      .sort((a, b) => {
-        const da = new Date(a.frontmatter?.updated || a.frontmatter?.created)
-        const db = new Date(b.frontmatter?.updated || b.frontmatter?.created)
-        return db - da
-      })
+    return notes
+      .map(n => ({ note: n, date: getNoteDate(n, 'updated') }))
+      .filter(x => x.date)
+      .sort((a, b) => b.date - a.date)
+      .map(x => x.note)
       .slice(0, 10)
   }, [notes])
 
@@ -143,16 +162,10 @@ export default function KnowledgePulse() {
 
     const activeDays = new Set()
     for (const note of notes) {
-      const created = note.frontmatter?.created
-      const updated = note.frontmatter?.updated
-      if (created) {
-        const d = new Date(created)
-        if (!isNaN(d.getTime())) activeDays.add(getDayKey(d))
-      }
-      if (updated) {
-        const d = new Date(updated)
-        if (!isNaN(d.getTime())) activeDays.add(getDayKey(d))
-      }
+      const c = getNoteDate(note, 'created')
+      const u = getNoteDate(note, 'updated')
+      if (c) activeDays.add(getDayKey(c))
+      if (u) activeDays.add(getDayKey(u))
     }
 
     let count = 0
@@ -440,7 +453,7 @@ export default function KnowledgePulse() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {recentNotes.map(note => {
                   const title = getTitle(note)
-                  const time = note.frontmatter?.updated || note.frontmatter?.created
+                  const nd = getNoteDate(note, 'updated'); const time = nd ? nd.toISOString() : null
                   return (
                     <div key={note.filename} style={{
                       display: 'flex',
