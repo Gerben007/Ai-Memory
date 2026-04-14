@@ -5,7 +5,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { getTagColor, getTags, getTagParts, suggestTags, getAllTagsWithCounts, buildTagTree } from '../lib/tagUtils'
 import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 import TagPill from './TagPill'
-import matter from 'gray-matter'
+import RelatedNotes from './RelatedNotes'
 
 export default function Editor() {
   const notes = useStore(s => s.notes)
@@ -13,6 +13,7 @@ export default function Editor() {
   const saveNote = useStore(s => s.saveNote)
   const deleteNote = useStore(s => s.deleteNote)
   const setActiveNote = useStore(s => s.setActiveNote)
+  const setActiveView = useStore(s => s.setActiveView)
   const createNote = useStore(s => s.createNote)
 
   const apiKey = useStore(s => s.apiKey)
@@ -96,11 +97,13 @@ export default function Editor() {
     try {
       const content = buildContent(bodyText, titleText, tagsText)
       await saveNote(activeNoteFilename, content)
-      setSaveStatus('Saved!')
+      setSaveStatus('Auto-saved')
       setDirty(false)
-      setTimeout(() => setSaveStatus(''), 3000)
+      setTimeout(() => setSaveStatus(''), 2000)
     } catch (err) {
       console.error('Auto-save failed:', err)
+      setSaveStatus('Auto-save failed')
+      setTimeout(() => setSaveStatus(''), 3000)
     }
   }, [activeNoteFilename, buildContent, saveNote])
 
@@ -466,6 +469,18 @@ Rules:
                 </button>
               </div>
             ) : (
+              {/* Close note → back to graph */}
+              <button
+                onClick={() => { setActiveNote(null); setActiveView('graph') }}
+                className="flex items-center justify-center rounded-lg transition-all"
+                style={{ width: 30, height: 30, border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                onMouseOver={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.borderColor = 'var(--border-hover)' }}
+                onMouseOut={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
+                title="Close note"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="flex items-center justify-center rounded-lg transition-all"
@@ -722,24 +737,34 @@ Rules:
         </div>
       )}
 
-      {/* ── Editor / Preview ────────────────────────────────────── */}
+      {/* ── Editor / Preview + Related ──────────────────────────── */}
       <div className="flex-1 flex overflow-hidden">
-        <div className={`${showPreview ? 'hidden sm:flex sm:w-1/2' : 'flex-1'} flex flex-col`}
-          style={showPreview ? { borderRight: '1px solid var(--border)' } : {}}>
-          <textarea
-            value={body}
-            onChange={handleBodyChange}
-            className="editor-textarea flex-1 w-full focus:outline-none p-5"
-            style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}
-            placeholder="Start writing in Markdown…"
-            spellCheck={false}
-          />
-        </div>
-        {showPreview && (
-          <div className="flex-1 sm:w-1/2 overflow-y-auto p-5 md:p-7" style={{ background: 'var(--bg-panel)' }}>
-            <div ref={previewRef} className="prose-vault max-w-2xl" dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+        {/* Editor + Preview */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 flex overflow-hidden">
+            <div className={`${showPreview ? 'hidden sm:flex sm:w-1/2' : 'flex-1'} flex flex-col`}
+              style={showPreview ? { borderRight: '1px solid var(--border)' } : {}}>
+              <textarea
+                value={body}
+                onChange={handleBodyChange}
+                className="editor-textarea flex-1 w-full focus:outline-none p-5"
+                style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                placeholder="Start writing in Markdown…"
+                spellCheck={false}
+              />
+            </div>
+            {showPreview && (
+              <div className="flex-1 sm:w-1/2 overflow-y-auto p-5 md:p-7" style={{ background: 'var(--bg-panel)' }}>
+                <div ref={previewRef} className="prose-vault max-w-2xl" dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Related Notes — bottom of editor */}
+          <div className="shrink-0 hidden sm:block" style={{ background: 'var(--bg-panel)' }}>
+            <RelatedNotes noteFilename={activeNoteFilename} />
+          </div>
+        </div>
       </div>
     </div>
   )
