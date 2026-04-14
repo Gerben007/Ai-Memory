@@ -10,6 +10,7 @@ export default function Editor() {
   const notes = useStore(s => s.notes)
   const activeNoteFilename = useStore(s => s.activeNoteFilename)
   const saveNote = useStore(s => s.saveNote)
+  const deleteNote = useStore(s => s.deleteNote)
   const setActiveNote = useStore(s => s.setActiveNote)
   const createNote = useStore(s => s.createNote)
 
@@ -24,6 +25,7 @@ export default function Editor() {
   const [showTagSuggestions, setShowTagSuggestions] = useState(false)
   const [showSplitConfirm, setShowSplitConfirm] = useState(false)
   const [splitResult, setSplitResult] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const previewRef = useRef(null)
   const tagInputRef = useRef(null)
 
@@ -296,6 +298,30 @@ export default function Editor() {
             >
               Preview
             </button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { deleteNote(activeNoteFilename); setConfirmDelete(false) }}
+                  className="text-[11px] md:text-xs bg-red-600 text-white px-2 py-1.5 rounded-lg hover:bg-red-500"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-[11px] md:text-xs text-gray-400 hover:text-gray-200 px-1"
+                >
+                  &times;
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-[11px] md:text-xs px-2 py-1.5 rounded-lg border border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/50"
+                title="Delete note"
+              >
+                🗑
+              </button>
+            )}
           </div>
         </div>
 

@@ -148,12 +148,20 @@ export const useStore = create((set, get) => ({
 
   saveNote: async (filename, content) => {
     try {
-      // Auto-normalize tags before saving
-      const { frontmatter, body } = parseFrontmatter(content)
-      if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
-        const tagCounts = getAllTagsWithCounts(get().notes)
-        frontmatter.tags = normalizeTags(frontmatter.tags, tagCounts)
-        content = matter.stringify(body, frontmatter)
+      // Auto-normalize tags before saving (safe — only modifies tag values, not structure)
+      try {
+        const { frontmatter, body } = parseFrontmatter(content)
+        if (frontmatter.tags && Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0) {
+          const tagCounts = getAllTagsWithCounts(get().notes)
+          const normalized = normalizeTags(frontmatter.tags, tagCounts)
+          if (normalized.join(',') !== frontmatter.tags.join(',')) {
+            frontmatter.tags = normalized
+            content = matter.stringify(body, frontmatter)
+          }
+        }
+      } catch (e) {
+        // If normalize fails, save original content unchanged
+        console.warn('Tag normalize skipped:', e.message)
       }
 
       await api.saveNote(filename, content)
