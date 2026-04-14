@@ -23,6 +23,7 @@ export default function Editor() {
   const [saveStatus, setSaveStatus] = useState('')
   const [dirty, setDirty] = useState(false)
   const [showTagSuggestions, setShowTagSuggestions] = useState(false)
+  const [tagSearch, setTagSearch] = useState('')
   const [showSplitConfirm, setShowSplitConfirm] = useState(false)
   const [splitResult, setSplitResult] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -160,11 +161,22 @@ export default function Editor() {
   }, [notes, currentTagList])
 
   const addTag = (tag) => {
+    if (currentTagList.some(t => t.toLowerCase() === tag.toLowerCase())) return
     const newTags = currentTagList.length > 0 ? `${tags}, ${tag}` : tag
     setTags(newTags)
     setDirty(true)
     triggerSave(body, title, newTags)
   }
+
+  // Close tag dropdown on outside click
+  useEffect(() => {
+    if (!showTagSuggestions) return
+    const handleClick = (e) => {
+      if (!e.target.closest('[data-tag-picker]')) setShowTagSuggestions(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showTagSuggestions])
 
   // Split note by headings
   const detectSections = useMemo(() => {
@@ -325,85 +337,106 @@ export default function Editor() {
           </div>
         </div>
 
-        {/* Tags row with suggestions */}
+        {/* Tags row */}
         <div className="mt-1.5 md:mt-2 flex items-center gap-2 md:gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0 relative">
             <span className="text-[10px] md:text-[11px] text-gray-500 shrink-0">Tags:</span>
-            <div className="flex-1 flex items-center gap-1 flex-wrap min-w-0">
-              {/* Tag pills */}
-              {currentTagList.map(tag => (
-                <span
-                  key={tag}
-                  className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1"
-                  style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}
-                >
-                  {tag}
-                  <button
-                    onClick={() => {
-                      const newTags = currentTagList.filter(t => t !== tag).join(', ')
-                      setTags(newTags)
-                      setDirty(true)
-                      triggerSave(body, title, newTags)
-                    }}
-                    className="hover:opacity-70 leading-none"
-                  >&times;</button>
-                </span>
-              ))}
-              <input
-                ref={tagInputRef}
-                type="text"
-                value={tags.includes(',') ? tags.split(',').pop().trim() : (currentTagList.length === 0 ? tags : '')}
-                onChange={(e) => {
-                  const base = currentTagList.length > 0
-                    ? currentTagList.join(', ') + (e.target.value ? ', ' + e.target.value : '')
-                    : e.target.value
-                  setTags(base)
-                  setDirty(true)
-                  triggerSave(body, title, base)
-                }}
-                onFocus={() => setShowTagSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
-                className="flex-1 min-w-[80px] bg-transparent text-xs md:text-sm text-gray-300 focus:outline-none placeholder-gray-600"
-                placeholder={currentTagList.length === 0 ? 'Add tags...' : '+ tag'}
-              />
-            </div>
+            {/* Current tags as pills */}
+            {currentTagList.map(tag => (
+              <span
+                key={tag}
+                className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0"
+                style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}
+              >
+                {tag}
+                <button
+                  onClick={() => {
+                    const newTags = currentTagList.filter(t => t !== tag).join(', ')
+                    setTags(newTags)
+                    setDirty(true)
+                    triggerSave(body, title, newTags)
+                  }}
+                  className="hover:opacity-70 leading-none"
+                >&times;</button>
+              </span>
+            ))}
+            {/* Add tag button */}
+            <button
+              onClick={() => setShowTagSuggestions(!showTagSuggestions)}
+              className="text-[10px] px-1.5 py-0.5 rounded-full border border-dashed border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500 shrink-0"
+            >
+              + tag
+            </button>
 
-            {/* Tag suggestions dropdown */}
-            {showTagSuggestions && (tagSuggestions.length > 0 || allVaultTags.length > 0) && (
-              <div className="absolute top-full left-0 right-0 mt-1 glass rounded-lg border border-white/10 shadow-xl z-50 max-h-52 overflow-y-auto">
-                {tagSuggestions.length > 0 && (
-                  <div className="p-2">
-                    <div className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">Suggested for this note</div>
-                    <div className="flex flex-wrap gap-1">
-                      {tagSuggestions.map(s => (
+            {/* Tag picker dropdown */}
+            {showTagSuggestions && (
+              <div data-tag-picker className="absolute top-full left-0 mt-1 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                {/* Search input */}
+                <div className="p-2 border-b border-gray-800">
+                  <input
+                    ref={tagInputRef}
+                    type="text"
+                    value={tagSearch}
+                    onChange={e => setTagSearch(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && tagSearch.trim()) {
+                        addTag(tagSearch.trim().toLowerCase())
+                        setTagSearch('')
+                      }
+                      if (e.key === 'Escape') setShowTagSuggestions(false)
+                    }}
+                    placeholder="Search or type new tag..."
+                    className="w-full bg-gray-800 text-xs text-gray-200 rounded-lg px-2.5 py-1.5 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="max-h-48 overflow-y-auto">
+                  {/* Suggested tags */}
+                  {tagSuggestions.length > 0 && (
+                    <div className="px-1 pt-1">
+                      <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">Suggested</div>
+                      {tagSuggestions.filter(s => !tagSearch || s.tag.toLowerCase().includes(tagSearch.toLowerCase())).map(s => (
                         <button
                           key={s.tag}
-                          onMouseDown={(e) => { e.preventDefault(); addTag(s.tag) }}
-                          className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 hover:border-[var(--accent)]/50 transition-colors"
-                          style={{ color: getTagColor(s.tag) }}
+                          onMouseDown={e => { e.preventDefault(); addTag(s.tag); setTagSearch('') }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
                         >
-                          + {s.tag} <span className="text-[var(--text-muted)] ml-0.5">({s.count})</span>
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(s.tag) }} />
+                          <span className="flex-1 text-gray-300">{s.tag}</span>
+                          <span className="text-[10px] text-gray-600">{s.count}</span>
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-                {allVaultTags.length > 0 && (
-                  <div className="p-2 border-t border-white/5">
-                    <div className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 px-1">All vault tags</div>
-                    <div className="flex flex-wrap gap-1">
-                      {allVaultTags.slice(0, 20).map(([tag, count]) => (
+                  )}
+
+                  {/* All vault tags */}
+                  <div className="px-1 py-1">
+                    {tagSuggestions.length > 0 && <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">All tags</div>}
+                    {allVaultTags
+                      .filter(([tag]) => !tagSearch || tag.toLowerCase().includes(tagSearch.toLowerCase()))
+                      .slice(0, 15)
+                      .map(([tag, count]) => (
                         <button
                           key={tag}
-                          onMouseDown={(e) => { e.preventDefault(); addTag(tag) }}
-                          className="text-[10px] px-2 py-0.5 rounded-full border border-white/5 hover:border-white/20 transition-colors text-[var(--text-secondary)]"
+                          onMouseDown={e => { e.preventDefault(); addTag(tag); setTagSearch('') }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
                         >
-                          {tag} <span className="text-[var(--text-muted)]">({count})</span>
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(tag) }} />
+                          <span className="flex-1 text-gray-400">{tag}</span>
+                          <span className="text-[10px] text-gray-600">{count}</span>
                         </button>
                       ))}
-                    </div>
+                    {tagSearch && !allVaultTags.some(([t]) => t.toLowerCase() === tagSearch.toLowerCase()) && (
+                      <button
+                        onMouseDown={e => { e.preventDefault(); addTag(tagSearch.trim().toLowerCase()); setTagSearch('') }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg text-indigo-400"
+                      >
+                        + Create "{tagSearch.trim()}"
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>
