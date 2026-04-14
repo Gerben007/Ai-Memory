@@ -9,11 +9,12 @@ import { getTagColor, getTags } from '../lib/tagUtils'
 const BASE_REPULSION = 12000
 const BASE_SPRING_STRENGTH = 0.015
 const BASE_IDEAL_LENGTH = 280
-const GRAVITY = 0.001
+const GRAVITY = 0       // no center pull — nodes float freely
 const DAMPING = 0.78
 const INITIAL_TEMP = 1.0
 const COOLING = 0.998
 const MIN_TEMP = 0.003
+const DRIFT = 0.15      // gentle random drift to keep nodes alive
 
 function hashCode(str) {
   let hash = 0
@@ -338,7 +339,7 @@ export default function GraphView() {
       const SPRING_STRENGTH = BASE_SPRING_STRENGTH
       const IDEAL_LENGTH = BASE_IDEAL_LENGTH * Math.max(0.4, screenScale)
 
-      if (nodes.length > 0 && temp > MIN_TEMP) {
+      if (nodes.length > 0) {
         for (let i = 0; i < nodes.length; i++) {
           for (let j = i + 1; j < nodes.length; j++) {
             const a = nodes[i], b = nodes[j]
@@ -356,16 +357,20 @@ export default function GraphView() {
           const f = (d - IDEAL_LENGTH) * SPRING_STRENGTH * temp
           s.vx += f * dx / d; s.vy += f * dy / d; t.vx -= f * dx / d; t.vy -= f * dy / d
         }
-        const cx = w / 2, cy = h / 2
-        for (const n of nodes) { n.vx += (cx - n.x) * GRAVITY; n.vy += (cy - n.y) * GRAVITY }
+        // Gentle random drift — keeps nodes floating, no center pull
         for (const n of nodes) {
           if (dragRef.current?.id === n.id) continue
-          n.vx *= DAMPING; n.vy *= DAMPING; n.x += n.vx; n.y += n.vy
-          const p = 60
-          if (n.x < p) { n.x = p; n.vx *= -0.5 }
-          if (n.x > w - p) { n.x = w - p; n.vx *= -0.5 }
-          if (n.y < p) { n.y = p; n.vy *= -0.5 }
-          if (n.y > h - p) { n.y = h - p; n.vy *= -0.5 }
+          // Random drift so nodes gently meander
+          n.vx += (Math.random() - 0.5) * DRIFT
+          n.vy += (Math.random() - 0.5) * DRIFT
+          // Soft boundary: push back gently when approaching edges
+          const margin = 80, softness = 0.02
+          if (n.x < margin)     n.vx += (margin - n.x) * softness
+          if (n.x > w - margin) n.vx -= (n.x - (w - margin)) * softness
+          if (n.y < margin)     n.vy += (margin - n.y) * softness
+          if (n.y > h - margin) n.vy -= (n.y - (h - margin)) * softness
+          n.vx *= DAMPING; n.vy *= DAMPING
+          n.x += n.vx; n.y += n.vy
         }
         tempRef.current *= COOLING
       }
