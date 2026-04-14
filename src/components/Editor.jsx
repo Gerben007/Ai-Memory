@@ -4,6 +4,7 @@ import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { getTagColor, getTags, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
 import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
+import TagPill from './TagPill'
 import matter from 'gray-matter'
 
 export default function Editor() {
@@ -408,24 +409,18 @@ Rules:
         <div className="mt-1.5 md:mt-2 flex items-center gap-2 md:gap-3">
           <div className="flex items-center gap-2 flex-1 min-w-0 relative">
             <span className="text-[10px] md:text-[11px] text-gray-500 shrink-0">Tags:</span>
-            {/* Current tags as pills */}
+            {/* Current tags as pills — click to see related notes */}
             {currentTagList.map(tag => (
-              <span
+              <TagPill
                 key={tag}
-                className="text-[10px] px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shrink-0"
-                style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}
-              >
-                {tag}
-                <button
-                  onClick={() => {
-                    const newTags = currentTagList.filter(t => t !== tag).join(', ')
-                    setTags(newTags)
-                    setDirty(true)
-                    triggerSave(body, title, newTags)
-                  }}
-                  className="hover:opacity-70 leading-none"
-                >&times;</button>
-              </span>
+                tag={tag}
+                onRemove={(t) => {
+                  const newTags = currentTagList.filter(x => x !== t).join(', ')
+                  setTags(newTags)
+                  setDirty(true)
+                  triggerSave(body, title, newTags)
+                }}
+              />
             ))}
             {/* Add tag button */}
             <button

@@ -1,6 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { useStore } from '../lib/store'
 import { extractWikilinks } from '../lib/wikilinkParser'
+import TagPill from './TagPill'
 import { renderMarkdown } from '../lib/markdownParser'
 import { getTagColor, getTags } from '../lib/tagUtils'
 
@@ -113,7 +114,7 @@ function NotePopup({ note, onClose, onOpenEditor }) {
             <h2 className="text-lg md:text-xl font-bold text-gray-100 truncate">{title}</h2>
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {tags.map(tag => (<span key={tag} className="text-[11px] px-2 py-0.5 rounded-full" style={{ backgroundColor: getTagColor(tag) + '30', color: getTagColor(tag) }}>{tag}</span>))}
+                {tags.map(tag => (<TagPill key={tag} tag={tag} />))}
               </div>
             )}
           </div>

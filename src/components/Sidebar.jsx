@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore, TEMPLATES } from '../lib/store'
 import { getTagColor, getAllTagsWithCounts } from '../lib/tagUtils'
 import TagCleanup from './TagCleanup'
+import TagPill from './TagPill'
 
 const NAV_ITEMS = [
   { key: 'editor', label: 'Notes', icon: '📝' },
@@ -212,7 +213,7 @@ export default function Sidebar({ onNavigate }) {
               {note.frontmatter?.tags?.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1.5">
                   {note.frontmatter.tags.slice(0, 3).map(tag => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: getTagColor(tag) + '20', color: getTagColor(tag) }}>{tag}</span>
+                    <TagPill key={tag} tag={tag} />
                   ))}
                   {note.frontmatter.tags.length > 3 && <span className="text-[10px] text-gray-500">+{note.frontmatter.tags.length - 3}</span>}
                 </div>
