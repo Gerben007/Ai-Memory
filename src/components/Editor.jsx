@@ -3,7 +3,7 @@ import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { getTagColor, getTags, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
-import { saveNote as apiSaveNote } from '../lib/api'
+import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 import matter from 'gray-matter'
 
 export default function Editor() {
@@ -14,6 +14,8 @@ export default function Editor() {
   const setActiveNote = useStore(s => s.setActiveNote)
   const createNote = useStore(s => s.createNote)
 
+  const apiKey = useStore(s => s.apiKey)
+  const model = useStore(s => s.model)
   const activeNote = notes.find(n => n.filename === activeNoteFilename)
 
   const [body, setBody] = useState('')
@@ -27,6 +29,7 @@ export default function Editor() {
   const [showSplitConfirm, setShowSplitConfirm] = useState(false)
   const [splitResult, setSplitResult] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [autoTagging, setAutoTagging] = useState(false)
   const previewRef = useRef(null)
   const tagInputRef = useRef(null)
 
@@ -166,6 +169,70 @@ export default function Editor() {
     setTags(newTags)
     setDirty(true)
     triggerSave(body, title, newTags)
+  }
+
+  // Auto-generate tags from content using AI
+  const handleAutoTag = async () => {
+    if (!body.trim() || autoTagging) return
+
+    const allTagCounts = getAllTagsWithCounts(notes)
+    const existingTags = [...allTagCounts.keys()]
+
+    // If no API key, fall back to keyword extraction
+    if (!apiKey) {
+      const extracted = suggestTags(body, title, currentTagList, notes)
+      if (extracted.length > 0) {
+        const newTags = [...currentTagList, ...extracted.map(s => s.tag)]
+        const joined = newTags.join(', ')
+        setTags(joined)
+        setDirty(true)
+        triggerSave(body, title, joined)
+      }
+      return
+    }
+
+    setAutoTagging(true)
+    try {
+      const res = await chatCompletion({
+        model,
+        max_tokens: 200,
+        system: `You are a tag generator for a knowledge vault. Given a note's content, generate relevant tags.
+
+Rules:
+- Return ONLY a comma-separated list of tags, nothing else
+- Use lowercase, single words or hyphenated phrases
+- Prefer reusing existing vault tags when they fit: ${existingTags.slice(0, 50).join(', ')}
+- Generate 3-7 tags total
+- Tags should categorize the topic, domain, and key concepts
+- Do NOT include tags the note already has: ${currentTagList.join(', ')}`,
+        messages: [{ role: 'user', content: `Title: ${title}\n\nContent:\n${body.slice(0, 2000)}` }]
+      }, apiKey)
+
+      const data = await res.json()
+      const aiText = data.content?.[0]?.text || ''
+      const aiTags = aiText.split(',').map(t => t.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')).filter(Boolean)
+
+      if (aiTags.length > 0) {
+        const combined = [...currentTagList, ...aiTags.filter(t => !currentTagList.some(c => c.toLowerCase() === t))]
+        const joined = combined.join(', ')
+        setTags(joined)
+        setDirty(true)
+        triggerSave(body, title, joined)
+      }
+    } catch (err) {
+      console.error('Auto-tag failed:', err)
+      // Fall back to keyword extraction
+      const extracted = suggestTags(body, title, currentTagList, notes)
+      if (extracted.length > 0) {
+        const newTags = [...currentTagList, ...extracted.map(s => s.tag)]
+        const joined = newTags.join(', ')
+        setTags(joined)
+        setDirty(true)
+        triggerSave(body, title, joined)
+      }
+    } finally {
+      setAutoTagging(false)
+    }
   }
 
   // Close tag dropdown on outside click
@@ -366,6 +433,15 @@ export default function Editor() {
               className="text-[10px] px-1.5 py-0.5 rounded-full border border-dashed border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500 shrink-0"
             >
               + tag
+            </button>
+            {/* Auto-generate tags */}
+            <button
+              onClick={handleAutoTag}
+              disabled={autoTagging || !body.trim()}
+              className="text-[10px] px-1.5 py-0.5 rounded-full border border-dashed border-indigo-700/50 text-indigo-400/70 hover:text-indigo-300 hover:border-indigo-500/50 disabled:opacity-30 shrink-0"
+              title="Auto-generate tags from content"
+            >
+              {autoTagging ? '...' : '✨ auto'}
             </button>
 
             {/* Tag picker dropdown */}
