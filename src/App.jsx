@@ -6,6 +6,7 @@ import ChatPanel from './components/ChatPanel'
 import BrainstormPanel from './components/BrainstormPanel'
 import GraphView from './components/GraphView'
 import AgentPanel from './components/AgentPanel'
+import ImportPanel from './components/ImportPanel'
 import Settings from './components/Settings'
 
 const NAV_ITEMS = [
@@ -78,6 +79,7 @@ export default function App() {
 
             {activeView === 'graph' && <GraphView />}
             {activeView === 'agent' && <AgentPanel />}
+            {activeView === 'import' && <ImportPanel />}
             {activeView === 'settings' && <Settings />}
           </div>
         </main>
