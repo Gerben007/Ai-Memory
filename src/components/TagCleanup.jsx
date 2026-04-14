@@ -13,6 +13,7 @@ export default function TagCleanup({ onClose }) {
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState(null)
   const [filter, setFilter] = useState('all') // all | issues | orphans
+  const [selectedTag, setSelectedTag] = useState(null)
 
   const health = useMemo(() => analyzeTagHealth(notes), [notes])
   const { tagCounts, issues, orphans } = health
@@ -117,7 +118,7 @@ export default function TagCleanup({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass-strong rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-fadeIn">
+      <div className="relative bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
         {/* Header */}
         <div className="p-4 md:p-5 border-b border-white/5">
           <div className="flex items-center justify-between">
@@ -190,66 +191,51 @@ export default function TagCleanup({ onClose }) {
               <p className="text-sm">{filter === 'issues' ? 'No tag issues found' : filter === 'orphans' ? 'No orphan tags' : 'No tags in vault'}</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {displayTags.map(([tag, count]) => (
-                <div
-                  key={tag}
-                  className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/[0.03] group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: getTagColor(tag) }}
-                    />
-                    {renaming?.from === tag ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-[var(--text-muted)]">{tag} →</span>
-                        <input
-                          type="text"
-                          value={renaming.to}
-                          onChange={e => setRenaming({ ...renaming, to: e.target.value })}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') renameTag(tag, renaming.to.trim())
-                            if (e.key === 'Escape') setRenaming(null)
-                          }}
-                          className="bg-transparent text-xs text-[var(--text-primary)] border-b border-[var(--accent)] focus:outline-none w-32"
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => renameTag(tag, renaming.to.trim())}
-                          disabled={processing || !renaming.to.trim()}
-                          className="text-[10px] text-[var(--accent)] hover:underline disabled:opacity-50"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setRenaming(null)}
-                          className="text-[10px] text-[var(--text-muted)]"
-                        >
-                          Cancel
-                        </button>
+                <div key={tag} className="rounded-lg hover:bg-white/[0.03]">
+                  {renaming?.from === tag ? (
+                    <div className="px-3 py-2 space-y-2">
+                      <div className="text-xs text-[var(--text-muted)]">Rename "{tag}" to:</div>
+                      <input
+                        type="text"
+                        value={renaming.to}
+                        onChange={e => setRenaming({ ...renaming, to: e.target.value })}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') renameTag(tag, renaming.to.trim())
+                          if (e.key === 'Escape') setRenaming(null)
+                        }}
+                        className="w-full bg-gray-800 text-sm text-[var(--text-primary)] rounded-lg px-2.5 py-1.5 border border-[var(--accent)] focus:outline-none"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => renameTag(tag, renaming.to.trim())} disabled={processing || !renaming.to.trim()} className="text-xs text-[var(--accent)] hover:underline disabled:opacity-50">Save</button>
+                        <button onClick={() => setRenaming(null)} className="text-xs text-[var(--text-muted)]">Cancel</button>
                       </div>
-                    ) : (
-                      <span className="text-sm text-[var(--text-primary)] truncate">{tag}</span>
-                    )}
-                    <span className="text-[10px] text-[var(--text-muted)] shrink-0">
-                      {count} note{count !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  {!renaming && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    </div>
+                  ) : (
+                    <div
+                      className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer"
+                      onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: getTagColor(tag) }} />
+                      <span className="text-sm text-[var(--text-primary)] flex-1">{tag}</span>
+                      <span className="text-[10px] text-[var(--text-muted)] shrink-0">{count}</span>
+                    </div>
+                  )}
+                  {/* Actions — shown on tap/select */}
+                  {selectedTag === tag && !renaming && (
+                    <div className="flex gap-2 px-3 pb-2">
                       <button
                         onClick={() => setRenaming({ from: tag, to: tag })}
-                        className="text-[10px] text-[var(--text-muted)] hover:text-[var(--accent)] px-1.5 py-0.5 rounded"
-                        title="Rename / merge tag"
+                        className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] px-2 py-1 rounded-lg bg-white/[0.03] border border-white/5"
                       >
                         Rename
                       </button>
                       <button
                         onClick={() => deleteTag(tag)}
                         disabled={processing}
-                        className="text-[10px] text-[var(--text-muted)] hover:text-red-400 px-1.5 py-0.5 rounded disabled:opacity-50"
-                        title="Remove tag from all notes"
+                        className="text-[11px] text-[var(--text-secondary)] hover:text-red-400 px-2 py-1 rounded-lg bg-white/[0.03] border border-white/5 disabled:opacity-50"
                       >
                         Delete
                       </button>
