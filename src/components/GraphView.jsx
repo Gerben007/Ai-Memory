@@ -375,19 +375,41 @@ export default function GraphView() {
         tempRef.current *= COOLING
       }
 
-      // ── RENDER ──────────────────────────────────────────────────────
+      // ── RENDER (futuristic) ─────────────────────────────────────────
       const { scale, offsetX, offsetY } = transformRef.current
       const dpr = window.devicePixelRatio || 1
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr)
-      ctx.clearRect(-offsetX / scale - 50, -offsetY / scale - 50, w / scale + 100, h / scale + 100)
+
+      const vx0 = -offsetX / scale - 50, vy0 = -offsetY / scale - 50
+      const vw = w / scale + 100, vh = h / scale + 100
+      ctx.clearRect(vx0, vy0, vw, vh)
 
       const hoverId = hoverRef.current
       const filterTag = selectedTagRef.current
-
-      // Which nodes match the selected tag?
+      const now = performance.now()
       const matchesFilter = (node) => !filterTag || node.tags.includes(filterTag)
 
-      // Edges
+      // ── Grid background ──
+      const gridSpacing = 50
+      ctx.strokeStyle = 'rgba(59,130,246,0.04)'
+      ctx.lineWidth = 0.5
+      const gx0 = Math.floor(vx0 / gridSpacing) * gridSpacing
+      const gy0 = Math.floor(vy0 / gridSpacing) * gridSpacing
+      for (let gx = gx0; gx < vx0 + vw; gx += gridSpacing) {
+        ctx.beginPath(); ctx.moveTo(gx, vy0); ctx.lineTo(gx, vy0 + vh); ctx.stroke()
+      }
+      for (let gy = gy0; gy < vy0 + vh; gy += gridSpacing) {
+        ctx.beginPath(); ctx.moveTo(vx0, gy); ctx.lineTo(vx0 + vw, gy); ctx.stroke()
+      }
+      // Grid intersections — bright dots
+      ctx.fillStyle = 'rgba(59,130,246,0.08)'
+      for (let gx = gx0; gx < vx0 + vw; gx += gridSpacing) {
+        for (let gy = gy0; gy < vy0 + vh; gy += gridSpacing) {
+          ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI * 2); ctx.fill()
+        }
+      }
+
+      // ── Edges — curved with energy particles ──
       for (const edge of edges) {
         const s = nMap.get(edge.source), t = nMap.get(edge.target)
         if (!s || !t) continue
@@ -396,102 +418,172 @@ export default function GraphView() {
         const edgeMatchesFilter = !filterTag || (edge.sharedTags && edge.sharedTags.includes(filterTag))
         const dimmed = filterTag && !edgeMatchesFilter && !isHl
 
-        if (edge.type === 'wikilink') {
-          ctx.strokeStyle = dimmed ? '#1e293b' : (isHl ? '#818cf8' : '#4f46e5')
-          ctx.lineWidth = isHl ? 3 : 2
-          ctx.globalAlpha = dimmed ? 0.15 : (isHl ? 0.9 : 0.5)
-          ctx.setLineDash([])
-        } else {
-          const tc = edge.sharedTags ? getTagColor(edge.sharedTags[0]) : '#94a3b8'
-          ctx.strokeStyle = dimmed ? '#1e293b' : (isHl ? tc : tc)
-          ctx.lineWidth = isHl ? 2.5 : 1.5
-          ctx.globalAlpha = dimmed ? 0.1 : (isHl ? 0.8 : (edgeMatchesFilter && filterTag ? 0.7 : 0.3))
-          ctx.setLineDash([6, 4])
+        const tc = edge.type === 'wikilink' ? '#60a5fa' : (edge.sharedTags ? getTagColor(edge.sharedTags[0]) : '#475569')
+
+        // Curved edge (bezier with offset control point)
+        const mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2
+        const dx = t.x - s.x, dy = t.y - s.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const curveOffset = Math.min(dist * 0.15, 40)
+        const cpx = mx + (-dy / dist) * curveOffset
+        const cpy = my + (dx / dist) * curveOffset
+
+        // Edge line
+        ctx.globalAlpha = dimmed ? 0.06 : (isHl ? 0.8 : 0.25)
+        ctx.strokeStyle = dimmed ? '#1e293b' : tc
+        ctx.lineWidth = isHl ? 2.5 : (edge.type === 'wikilink' ? 1.5 : 1)
+        ctx.setLineDash(edge.type === 'wikilink' ? [] : [4, 6])
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.quadraticCurveTo(cpx, cpy, t.x, t.y); ctx.stroke()
+        ctx.setLineDash([])
+
+        // Energy particles flowing along edge
+        if (!dimmed && (isHl || edge.type === 'wikilink')) {
+          const particleCount = isHl ? 3 : 1
+          for (let p = 0; p < particleCount; p++) {
+            const speed = 0.0004 + p * 0.00015
+            const pt = ((now * speed + hashCode(edge.source + edge.target + p) * 0.1) % 1)
+            // Quadratic bezier point
+            const u = 1 - pt
+            const px = u * u * s.x + 2 * u * pt * cpx + pt * pt * t.x
+            const py = u * u * s.y + 2 * u * pt * cpy + pt * pt * t.y
+            const pr = isHl ? 2.5 : 1.5
+            const pGrad = ctx.createRadialGradient(px, py, 0, px, py, pr * 3)
+            pGrad.addColorStop(0, tc + 'cc')
+            pGrad.addColorStop(1, tc + '00')
+            ctx.globalAlpha = isHl ? 0.9 : 0.5
+            ctx.fillStyle = pGrad
+            ctx.beginPath(); ctx.arc(px, py, pr * 3, 0, Math.PI * 2); ctx.fill()
+            ctx.fillStyle = '#fff'
+            ctx.globalAlpha = isHl ? 1 : 0.6
+            ctx.beginPath(); ctx.arc(px, py, pr * 0.6, 0, Math.PI * 2); ctx.fill()
+          }
         }
-        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y); ctx.stroke()
-        ctx.setLineDash([]); ctx.globalAlpha = 1
+        ctx.globalAlpha = 1
 
         // Tag label on hover
         if (isHl && edge.type === 'tag' && edge.sharedTags) {
-          const mx = (s.x + t.x) / 2, my = (s.y + t.y) / 2, label = edge.sharedTags.join(', ')
-          ctx.font = '10px system-ui, sans-serif'; ctx.textAlign = 'center'
-          const tw = ctx.measureText(label).width + 8
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; ctx.beginPath(); ctx.roundRect(mx - tw / 2, my - 8, tw, 16, 4); ctx.fill()
-          ctx.fillStyle = getTagColor(edge.sharedTags[0]); ctx.fillText(label, mx, my + 3)
+          const label = edge.sharedTags.join(', ')
+          ctx.font = '10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'
+          const tw = ctx.measureText(label).width + 12
+          ctx.fillStyle = 'rgba(9,9,13,0.92)'; ctx.strokeStyle = tc + '40'; ctx.lineWidth = 1
+          ctx.beginPath(); ctx.roundRect(cpx - tw / 2, cpy - 9, tw, 18, 4); ctx.fill(); ctx.stroke()
+          ctx.fillStyle = tc; ctx.fillText(label, cpx, cpy + 3)
         }
       }
 
-      // Nodes
-      const now = performance.now()
+      // ── Nodes — ring style with orbital halo ──
       for (const node of nodes) {
         const isHovered = hoverId === node.id
         const matches = matchesFilter(node)
         const dimmed = filterTag && !matches && !isHovered
-
-        const r = isHovered ? node.radius * 1.15 : node.radius
-
-        // Recency glow — recent notes pulse, old notes are dim
+        const r = isHovered ? node.radius * 1.2 : node.radius
         const recency = node.recency
-        if (!dimmed && recency > 0.05) {
-          // Each node gets a unique phase offset so they don't pulse in sync
-          const phase = (hashCode(node.id) % 628) / 100 // 0..~6.28 (one full cycle)
-          const pulse = 0.5 + 0.5 * Math.sin(now / 1200 + phase)
-          const glowIntensity = recency * (0.5 + pulse * 0.5)
-          const glowRadius = r + 4 + recency * 14
+        const phase = (hashCode(node.id) % 628) / 100
+        const pulse = 0.5 + 0.5 * Math.sin(now / 1200 + phase)
 
-          // Outer glow ring (no shadow needed — draw a transparent radial gradient)
-          const glowGrad = ctx.createRadialGradient(node.x, node.y, r, node.x, node.y, glowRadius)
-          glowGrad.addColorStop(0, node.color + Math.round(glowIntensity * 80).toString(16).padStart(2, '0'))
-          glowGrad.addColorStop(1, node.color + '00')
-          ctx.fillStyle = glowGrad
-          ctx.beginPath(); ctx.arc(node.x, node.y, glowRadius, 0, Math.PI * 2); ctx.fill()
+        if (!dimmed) {
+          // Outer glow field
+          const glowR = r + 6 + (recency * 18) + (isHovered ? 10 : 0)
+          const glowIntensity = recency * (0.3 + pulse * 0.4) + (isHovered ? 0.4 : 0)
+          const gGrad = ctx.createRadialGradient(node.x, node.y, r * 0.5, node.x, node.y, glowR)
+          gGrad.addColorStop(0, node.color + Math.round(glowIntensity * 50).toString(16).padStart(2, '0'))
+          gGrad.addColorStop(0.6, node.color + Math.round(glowIntensity * 20).toString(16).padStart(2, '0'))
+          gGrad.addColorStop(1, node.color + '00')
+          ctx.fillStyle = gGrad
+          ctx.beginPath(); ctx.arc(node.x, node.y, glowR, 0, Math.PI * 2); ctx.fill()
+
+          // Orbital ring for hub nodes
+          if (node.connections >= 3 || isHovered) {
+            const orbR = r + 5 + (isHovered ? 4 : 0)
+            const orbAlpha = (0.15 + pulse * 0.15) * (isHovered ? 2 : 1)
+            ctx.strokeStyle = node.color + Math.round(orbAlpha * 255).toString(16).padStart(2, '0')
+            ctx.lineWidth = 0.8
+            ctx.setLineDash([3, 8])
+            ctx.beginPath(); ctx.arc(node.x, node.y, orbR, now / 2000 + phase, now / 2000 + phase + Math.PI * 1.5); ctx.stroke()
+            ctx.setLineDash([])
+          }
         }
 
-        // Node body
-        const grad = ctx.createRadialGradient(node.x - r * 0.25, node.y - r * 0.25, r * 0.1, node.x, node.y, r)
-        if (dimmed) {
-          grad.addColorStop(0, '#334155'); grad.addColorStop(1, '#1e293b')
-        } else {
-          // Brighter core for recent notes
-          const coreAlpha = recency > 0.3 ? 'ff' : 'cc'
-          grad.addColorStop(0, node.color.slice(0, 7) + coreAlpha)
-          grad.addColorStop(1, node.color + '88')
-          if (isHovered) { ctx.shadowColor = node.color; ctx.shadowBlur = 30 }
+        // Node core — dark center with bright ring
+        const coreR = r * 0.65
+        // Dark fill
+        ctx.fillStyle = dimmed ? '#111827' : '#0c0f1a'
+        ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, Math.PI * 2); ctx.fill()
+
+        // Bright ring edge
+        ctx.strokeStyle = dimmed ? '#1e293b' : node.color
+        ctx.lineWidth = isHovered ? 2.5 : 1.5
+        ctx.globalAlpha = dimmed ? 0.2 : (isHovered ? 1 : 0.7)
+        ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, Math.PI * 2); ctx.stroke()
+        ctx.globalAlpha = 1
+
+        // Inner bright core
+        if (!dimmed) {
+          const cGrad = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, coreR)
+          const coreB = Math.round((0.4 + recency * 0.6) * 255).toString(16).padStart(2, '0')
+          cGrad.addColorStop(0, node.color.slice(0, 7) + coreB)
+          cGrad.addColorStop(1, node.color + '10')
+          ctx.fillStyle = cGrad
+          ctx.beginPath(); ctx.arc(node.x, node.y, coreR, 0, Math.PI * 2); ctx.fill()
         }
 
-        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(node.x, node.y, r, 0, Math.PI * 2); ctx.fill()
-        ctx.strokeStyle = dimmed ? '#1e293b' : (isHovered ? '#ffffff' : node.color + '40')
-        ctx.lineWidth = isHovered ? 2 : 1; ctx.stroke()
-        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0
-
-        // Label — hover OR matching filter. Hub labels only on desktop to avoid clutter.
+        // Label
         const isMobile = w < 768
-        const showLabel = isHovered || (filterTag && matches) || (!isMobile && node.connections >= 5)
+        const showLabel = isHovered || (filterTag && matches) || (!isMobile && node.connections >= 4)
         if (showLabel) {
-          ctx.fillStyle = isHovered ? '#f1f5f9' : '#94a3b8'
-          ctx.font = `${isHovered ? 'bold ' : ''}${isHovered ? 13 : 11}px system-ui, sans-serif`
-          ctx.textAlign = 'center'; ctx.fillText(node.title, node.x, node.y + r + 16)
+          const labelY = node.y + r + 14
+          // Label background
+          ctx.font = `${isHovered ? '600 ' : ''}${isHovered ? 12 : 10}px "IBM Plex Sans", sans-serif`
+          ctx.textAlign = 'center'
+          const lw = ctx.measureText(node.title).width + 10
+          ctx.fillStyle = 'rgba(9,9,13,0.85)'
+          ctx.beginPath(); ctx.roundRect(node.x - lw / 2, labelY - 8, lw, 16, 3); ctx.fill()
+          ctx.fillStyle = isHovered ? '#f1f5f9' : '#8b8fa8'
+          ctx.fillText(node.title, node.x, labelY + 3)
         }
       }
 
-      // Tooltip
+      // ── HUD Tooltip ──
       if (hoverId) {
         const node = nMap.get(hoverId)
         if (node) {
-          const tx = node.x + node.radius + 14, ty = node.y - 30
-          const tagText = node.tags.length > 0 ? node.tags.join(', ') : 'untagged'
-          const connText = `${node.connections} connection${node.connections !== 1 ? 's' : ''}`
-          const recencyText = node.recency > 0.8 ? 'Active now' : node.recency > 0.5 ? 'Recent' : node.recency > 0.2 ? 'This month' : 'Older'
-          ctx.font = 'bold 13px system-ui, sans-serif'
+          const tx = node.x + node.radius + 18, ty = node.y - 40
+          const tagText = node.tags.length > 0 ? node.tags.join(' · ') : 'untagged'
+          const connText = `${node.connections} link${node.connections !== 1 ? 's' : ''}`
+          const recencyText = node.recency > 0.8 ? 'ACTIVE' : node.recency > 0.5 ? 'RECENT' : node.recency > 0.2 ? 'THIS MONTH' : 'DORMANT'
+
+          ctx.font = '600 12px "IBM Plex Sans", sans-serif'
           const tw = ctx.measureText(node.title).width
-          ctx.font = '11px system-ui, sans-serif'
-          const boxW = Math.max(tw, ctx.measureText(tagText).width, ctx.measureText(`${connText}  ·  ${recencyText}`).width) + 28
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.strokeStyle = node.color + '50'; ctx.lineWidth = 1
-          ctx.beginPath(); ctx.roundRect(tx, ty, boxW, 64, 8); ctx.fill(); ctx.stroke()
-          ctx.textAlign = 'left'; ctx.fillStyle = '#f1f5f9'; ctx.font = 'bold 13px system-ui, sans-serif'
-          ctx.fillText(node.title, tx + 14, ty + 20)
-          ctx.fillStyle = node.color; ctx.font = '11px system-ui, sans-serif'; ctx.fillText(tagText, tx + 14, ty + 38)
-          ctx.fillStyle = '#64748b'; ctx.fillText(`${connText}  ·  ${recencyText}`, tx + 14, ty + 54)
+          ctx.font = '10px "IBM Plex Mono", monospace'
+          const boxW = Math.max(tw + 12, ctx.measureText(tagText).width + 12, 160) + 24
+          const boxH = 72
+
+          // HUD background with accent border
+          ctx.fillStyle = 'rgba(9,9,13,0.94)'
+          ctx.strokeStyle = node.color + '60'
+          ctx.lineWidth = 1
+          ctx.beginPath(); ctx.roundRect(tx, ty, boxW, boxH, 6); ctx.fill(); ctx.stroke()
+
+          // Accent line at top
+          ctx.fillStyle = node.color
+          ctx.fillRect(tx + 1, ty + 1, boxW - 2, 2)
+
+          // Title
+          ctx.textAlign = 'left'
+          ctx.fillStyle = '#f1f5f9'
+          ctx.font = '600 12px "IBM Plex Sans", sans-serif'
+          ctx.fillText(node.title, tx + 12, ty + 22)
+
+          // Tags
+          ctx.fillStyle = node.color
+          ctx.font = '10px "IBM Plex Mono", monospace'
+          ctx.fillText(tagText, tx + 12, ty + 40)
+
+          // Stats line
+          ctx.fillStyle = '#4a5568'
+          ctx.fillText(`${connText}`, tx + 12, ty + 58)
+          ctx.fillStyle = node.recency > 0.5 ? '#4ade80' : '#64748b'
+          ctx.fillText(recencyText, tx + 12 + ctx.measureText(`${connText}   `).width, ty + 58)
         }
       }
 
