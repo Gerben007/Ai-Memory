@@ -4,9 +4,10 @@ import { extractWikilinks } from '../lib/wikilinkParser'
 import { renderMarkdown } from '../lib/markdownParser'
 import { getTagColor, getTags } from '../lib/tagUtils'
 
-const REPULSION = 12000
-const SPRING_STRENGTH = 0.015
-const IDEAL_LENGTH = 280
+// Physics constants are scaled by screen size in the simulation loop
+const BASE_REPULSION = 12000
+const BASE_SPRING_STRENGTH = 0.015
+const BASE_IDEAL_LENGTH = 280
 const GRAVITY = 0.001
 const DAMPING = 0.78
 const INITIAL_TEMP = 1.0
@@ -293,11 +294,14 @@ export default function GraphView() {
     if (!canvas) return
     const w = canvas.parentElement.clientWidth, h = canvas.parentElement.clientHeight
     const n = data.nodes.length
-    const maxR = Math.min(w, h) * 0.42
+    // Use the larger dimension so nodes spread across the full available space
+    const maxR = Math.max(w, h) * 0.4
     for (let i = 0; i < n; i++) {
-      const a = (2 * Math.PI * i) / n, r = maxR * (0.4 + Math.random() * 0.6)
-      data.nodes[i].x = w / 2 + Math.cos(a) * r
-      data.nodes[i].y = h / 2 + Math.sin(a) * r
+      // Spread in an ellipse matching the screen aspect ratio
+      const a = (2 * Math.PI * i) / n + (Math.random() - 0.5) * 0.3
+      const r = maxR * (0.3 + Math.random() * 0.7)
+      data.nodes[i].x = w / 2 + Math.cos(a) * r * (w / Math.max(w, h))
+      data.nodes[i].y = h / 2 + Math.sin(a) * r * (h / Math.max(w, h))
     }
     graphRef.current = data
     setAllTags(data.allTags)
@@ -326,6 +330,12 @@ export default function GraphView() {
       const { nodes, edges } = graphRef.current
       const w = canvas.clientWidth, h = canvas.clientHeight, temp = tempRef.current
       const nMap = new Map(); for (const n of nodes) nMap.set(n.id, n)
+
+      // Scale physics to screen size (reference: 1200px wide desktop)
+      const screenScale = Math.min(w, h) / 1200
+      const REPULSION = BASE_REPULSION * Math.max(0.3, screenScale)
+      const SPRING_STRENGTH = BASE_SPRING_STRENGTH
+      const IDEAL_LENGTH = BASE_IDEAL_LENGTH * Math.max(0.4, screenScale)
 
       if (nodes.length > 0 && temp > MIN_TEMP) {
         for (let i = 0; i < nodes.length; i++) {
@@ -593,8 +603,15 @@ export default function GraphView() {
   const handleReset = () => {
     const canvas = canvasRef.current; if (!canvas) return
     const w = canvas.parentElement.clientWidth, h = canvas.parentElement.clientHeight
-    const { nodes } = graphRef.current; const n = nodes.length; const r = Math.min(w, h) * 0.42
-    for (let i = 0; i < n; i++) { const a = (2 * Math.PI * i) / n; const d = r * (0.4 + Math.random() * 0.6); nodes[i].x = w / 2 + Math.cos(a) * d; nodes[i].y = h / 2 + Math.sin(a) * d; nodes[i].vx = 0; nodes[i].vy = 0 }
+    const { nodes } = graphRef.current; const n = nodes.length
+    const maxR = Math.max(w, h) * 0.4
+    for (let i = 0; i < n; i++) {
+      const a = (2 * Math.PI * i) / n + (Math.random() - 0.5) * 0.3
+      const r = maxR * (0.3 + Math.random() * 0.7)
+      nodes[i].x = w / 2 + Math.cos(a) * r * (w / Math.max(w, h))
+      nodes[i].y = h / 2 + Math.sin(a) * r * (h / Math.max(w, h))
+      nodes[i].vx = 0; nodes[i].vy = 0
+    }
     transformRef.current = { scale: 1, offsetX: 0, offsetY: 0 }; tempRef.current = INITIAL_TEMP; forceUpdate(n => n + 1)
   }
 
