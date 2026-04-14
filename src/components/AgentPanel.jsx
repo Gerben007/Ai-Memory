@@ -72,7 +72,7 @@ export default function AgentPanel() {
 
         try {
           const res = await chatCompletion({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-sonnet-4-6',
             max_tokens: 512,
             system: systemPrompt,
             messages: [{ role: 'user', content: query }],

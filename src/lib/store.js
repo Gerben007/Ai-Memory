@@ -3,6 +3,7 @@ import matter from 'gray-matter'
 import * as api from './api'
 import { chunkAllNotes } from './chunker'
 import { BM25Index } from './bm25'
+import { getTags, getAllTagsWithCounts, normalizeTags } from './tagUtils'
 
 const CHAT_STORAGE_KEY = 'kv-chat-messages'
 const API_KEY_STORAGE_KEY = 'kv-anthropic-key'
@@ -99,9 +100,47 @@ export const useStore = create((set, get) => ({
         return { filename: n.filename, content: n.content, body, frontmatter }
       })
       set({ notes, initialized: true })
+
+      // Auto-cleanup tags on startup (runs in background, doesn't block UI)
+      setTimeout(() => get().autoCleanupTags(), 500)
     } catch (err) {
       console.error('Failed to load notes:', err)
       set({ notes: [], initialized: true })
+    }
+  },
+
+  // Automatically normalize all tags across the vault
+  autoCleanupTags: async () => {
+    const notes = get().notes
+    const tagCounts = getAllTagsWithCounts(notes)
+    let fixed = 0
+
+    for (const note of notes) {
+      const currentTags = getTags(note)
+      if (currentTags.length === 0) continue
+
+      const normalized = normalizeTags(currentTags, tagCounts)
+
+      // Check if anything changed
+      if (currentTags.length === normalized.length && currentTags.every((t, i) => t === normalized[i])) continue
+
+      // Rewrite the note with normalized tags
+      const fm = { ...(note.frontmatter || {}), tags: normalized, updated: new Date().toISOString() }
+      const content = matter.stringify(note.body || '', fm)
+      await api.saveNote(note.filename, content)
+      fixed++
+    }
+
+    if (fixed > 0) {
+      console.log(`[Tag cleanup] Auto-normalized tags in ${fixed} note(s)`)
+      // Reload to reflect changes
+      const raw = await api.fetchNotes()
+      const updatedNotes = raw.map(n => {
+        const { frontmatter, body } = parseFrontmatter(n.content)
+        return { filename: n.filename, content: n.content, body, frontmatter }
+      })
+      set({ notes: updatedNotes })
+      get().rebuildIndex()
     }
   },
 
@@ -109,8 +148,15 @@ export const useStore = create((set, get) => ({
 
   saveNote: async (filename, content) => {
     try {
-      await api.saveNote(filename, content)
+      // Auto-normalize tags before saving
       const { frontmatter, body } = parseFrontmatter(content)
+      if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
+        const tagCounts = getAllTagsWithCounts(get().notes)
+        frontmatter.tags = normalizeTags(frontmatter.tags, tagCounts)
+        content = matter.stringify(body, frontmatter)
+      }
+
+      await api.saveNote(filename, content)
       set(state => ({
         notes: state.notes.map(n => n.filename === filename ? { ...n, content, body, frontmatter } : n)
       }))
@@ -252,7 +298,7 @@ export const useStore = create((set, get) => ({
     api.saveConfig({ apiKey: key }).catch(() => {})
   },
 
-  model: localStorage.getItem(MODEL_STORAGE_KEY) || 'claude-sonnet-4-20250514',
+  model: localStorage.getItem(MODEL_STORAGE_KEY) || 'claude-sonnet-4-6',
   setModel: (m) => {
     localStorage.setItem(MODEL_STORAGE_KEY, m)
     set({ model: m })

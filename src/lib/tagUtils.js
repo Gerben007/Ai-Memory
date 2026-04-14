@@ -41,6 +41,44 @@ export function getAllTagsWithCounts(notes) {
   return counts
 }
 
+// Normalize tags for a single note against the existing vault tag registry.
+// Rules: lowercase, trim, deduplicate, prefer existing vault spelling (most-used variant wins).
+export function normalizeTags(tags, vaultTagCounts) {
+  if (!tags || tags.length === 0) return tags
+
+  // Build lookup: lowercase -> most-used variant in vault
+  const canonical = new Map()
+  if (vaultTagCounts) {
+    for (const [tag, count] of vaultTagCounts) {
+      const lower = tag.toLowerCase()
+      const existing = canonical.get(lower)
+      if (!existing || count > existing.count) {
+        canonical.set(lower, { tag, count })
+      }
+    }
+  }
+
+  const seen = new Set()
+  const result = []
+  for (const raw of tags) {
+    let tag = raw.trim()
+    if (!tag) continue
+
+    // Lowercase
+    const lower = tag.toLowerCase()
+
+    // Deduplicate
+    if (seen.has(lower)) continue
+    seen.add(lower)
+
+    // Use canonical vault spelling if it exists, otherwise lowercase
+    const vaultVersion = canonical.get(lower)
+    result.push(vaultVersion ? vaultVersion.tag : lower)
+  }
+
+  return result
+}
+
 // Suggest tags for a note based on existing vault tags and note content
 export function suggestTags(noteBody, noteTitle, currentTags, allNotes) {
   const allTagCounts = getAllTagsWithCounts(allNotes)

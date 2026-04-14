@@ -139,9 +139,9 @@ export default function Settings() {
           </p>
           <div className="space-y-2">
             {[
-              { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', desc: 'Best balance of speed and quality' },
-              { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', desc: 'Fastest, most available, lower cost' },
-              { id: 'claude-opus-4-20250514', label: 'Claude Opus 4', desc: 'Most capable, slower, higher cost' }
+              { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4', desc: 'Best balance of speed and quality' },
+              { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', desc: 'Fastest, most available, lower cost' },
+              { id: 'claude-opus-4-6', label: 'Claude Opus 4', desc: 'Most capable, slower, higher cost' }
             ].map(m => (
               <button
                 key={m.id}
