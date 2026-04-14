@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { getAllTagsWithCounts } from '../lib/tagUtils'
 import TagCleanup from './TagCleanup'
+import WebClipper from './WebClipper'
+import AgentPanel from './AgentPanel'
 import JSZip from 'jszip'
 
 export default function Settings() {
@@ -12,12 +14,20 @@ export default function Settings() {
   const notes = useStore(s => s.notes)
   const bm25Index = useStore(s => s.bm25Index)
   const clearChat = useStore(s => s.clearChat)
+  const vaultContext = useStore(s => s.vaultContext)
+  const vaultContextLoading = useStore(s => s.vaultContextLoading)
+  const loadContext = useStore(s => s.loadContext)
+  const generateContextAction = useStore(s => s.generateContext)
 
   const [keyInput, setKeyInput] = useState(apiKey)
   const [showKey, setShowKey] = useState(false)
   const [keyStatus, setKeyStatus] = useState('')
   const [confirmClear, setConfirmClear] = useState(false)
   const [showTagCleanup, setShowTagCleanup] = useState(false)
+  const [contextStatus, setContextStatus] = useState('')
+
+  // Load vault context on mount
+  useEffect(() => { loadContext() }, [])
 
   const tagCount = getAllTagsWithCounts(notes).size
 
@@ -163,6 +173,58 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* Vault Context */}
+        <section>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Vault Context</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            A persistent profile of your vault that gets injected into AI chat. Helps Claude understand your world — key topics, projects, interests, and frequent entities.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={async () => {
+                if (!apiKey) {
+                  setContextStatus('Set your API key first')
+                  setTimeout(() => setContextStatus(''), 3000)
+                  return
+                }
+                if (notes.length === 0) {
+                  setContextStatus('No notes in vault')
+                  setTimeout(() => setContextStatus(''), 3000)
+                  return
+                }
+                setContextStatus('Generating...')
+                try {
+                  await generateContextAction()
+                  setContextStatus('Context refreshed!')
+                } catch (err) {
+                  setContextStatus(`Error: ${err.message}`)
+                }
+                setTimeout(() => setContextStatus(''), 4000)
+              }}
+              disabled={vaultContextLoading}
+              className="w-full text-left text-sm bg-gray-800 text-gray-300 px-4 py-3 rounded-lg hover:bg-gray-700 border border-gray-700 disabled:opacity-50"
+            >
+              <div className="font-medium">{vaultContextLoading ? 'Generating context...' : 'Refresh Context'}</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Analyze all notes and generate a vault profile for AI chat
+              </div>
+            </button>
+            {contextStatus && (
+              <div className={`text-xs px-2 ${contextStatus.includes('Error') || contextStatus.includes('Set') || contextStatus.includes('No notes') ? 'text-amber-400' : 'text-green-400'}`}>
+                {contextStatus}
+              </div>
+            )}
+            {vaultContext && (
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
+                <div className="text-xs text-gray-500 mb-2 font-medium">Current vault profile:</div>
+                <div className="text-xs text-gray-400 whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
+                  {vaultContext}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Vault Info */}
         <section>
           <h3 className="text-sm font-semibold text-gray-300 mb-3">Vault Information</h3>
@@ -252,6 +314,18 @@ export default function Settings() {
                 <div className="text-xs text-gray-500 mt-0.5">Remove all AI chat messages from localStorage</div>
               </button>
             )}
+          </div>
+        </section>
+
+        {/* Web Clipper */}
+        <section>
+          <WebClipper />
+        </section>
+
+        {/* Agent API */}
+        <section>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+            <AgentPanel />
           </div>
         </section>
       </div>

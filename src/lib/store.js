@@ -307,5 +307,40 @@ export const useStore = create((set, get) => ({
         set({ model: config.model })
       }
     } catch {}
+  },
+
+  // Vault Context — persistent vault profile
+  vaultContext: '',
+  vaultContextLoading: false,
+
+  loadContext: async () => {
+    try {
+      const { content } = await api.loadContext()
+      set({ vaultContext: content || '' })
+    } catch {
+      set({ vaultContext: '' })
+    }
+  },
+
+  generateContext: async () => {
+    const { notes, apiKey, model } = get()
+    if (!apiKey) throw new Error('API key not set')
+
+    set({ vaultContextLoading: true })
+    try {
+      // Build note summaries: title + tags + first 200 chars of body
+      const summaries = notes.map(n => {
+        const title = n.frontmatter?.title || n.filename
+        const tags = (n.frontmatter?.tags || []).join(', ')
+        const snippet = (n.body || '').slice(0, 200).trim()
+        return `### ${title}\nTags: ${tags || 'none'}\n${snippet}\n`
+      }).join('\n')
+
+      const { content } = await api.generateContext(summaries, apiKey, model)
+      set({ vaultContext: content, vaultContextLoading: false })
+    } catch (err) {
+      set({ vaultContextLoading: false })
+      throw err
+    }
   }
 }))

@@ -48,6 +48,76 @@ export async function deleteNote(filename) {
   return res.json()
 }
 
+export async function loadContext() {
+  const res = await fetch(`${API_BASE}/context`)
+  if (!res.ok) return { content: '' }
+  return res.json()
+}
+
+export async function generateContext(noteSummaries, apiKey, model) {
+  const prompt = `You are analyzing a personal knowledge vault. Based on the note titles, tags, and content snippets below, synthesize a concise vault profile.
+
+Output a markdown document with these sections:
+## Key Topics
+Bullet list of the main topics/themes across the vault.
+
+## Active Projects
+Any projects or ongoing work mentioned in the notes.
+
+## Frequent Tags
+The most-used tags and what they represent.
+
+## Important People & Entities
+People, organizations, or entities mentioned frequently.
+
+## User Interests Pattern
+A short paragraph describing the user's interests, work patterns, and knowledge areas.
+
+---
+
+Here are the notes:
+
+${noteSummaries}
+
+Write ONLY the markdown profile. Be concise but thorough.`
+
+  const res = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+
+  if (!res.ok) {
+    let errMsg = `API error (${res.status})`
+    try {
+      const json = await res.json()
+      const err = json.error
+      if (typeof err === 'object' && err !== null) errMsg = err.message || JSON.stringify(err)
+      else if (typeof err === 'string') errMsg = err
+    } catch {}
+    throw new Error(errMsg)
+  }
+
+  const data = await res.json()
+  const content = data.content?.[0]?.text || ''
+
+  // Save to server
+  await fetch(`${API_BASE}/context`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content })
+  })
+
+  return { content }
+}
+
 export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
   let lastError
 

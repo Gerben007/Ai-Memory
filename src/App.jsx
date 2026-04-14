@@ -115,6 +115,7 @@ export default function App() {
   const setActiveView = useStore(s => s.setActiveView)
   const loadNotes = useStore(s => s.loadNotes)
   const loadConfig = useStore(s => s.loadConfig)
+  const loadContext = useStore(s => s.loadContext)
   const rebuildIndex = useStore(s => s.rebuildIndex)
   const initialized = useStore(s => s.initialized)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -137,9 +138,10 @@ export default function App() {
       await loadConfig()
       await loadNotes()
       rebuildIndex()
+      loadContext()
     }
     init()
-  }, [loadNotes, loadConfig, rebuildIndex])
+  }, [loadNotes, loadConfig, loadContext, rebuildIndex])
 
   const handleNavClick = (view) => {
     setActiveView(view)

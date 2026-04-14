@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 3001
 const HOST = process.env.HOST || '0.0.0.0'
 const VAULT_DIR = process.env.VAULT_DIR || path.join(__dirname, '..', 'vault')
 const CONFIG_PATH = path.join(VAULT_DIR, '.vault-config.json')
+const CONTEXT_PATH = path.join(VAULT_DIR, '.vault-context.md')
 
 // Ensure vault directory exists
 if (!fs.existsSync(VAULT_DIR)) {
@@ -57,6 +58,54 @@ app.post('/api/config', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
+})
+
+// Vault context endpoints — persistent vault profile at .vault-context.md
+app.get('/api/context', (req, res) => {
+  try {
+    if (fs.existsSync(CONTEXT_PATH)) {
+      const content = fs.readFileSync(CONTEXT_PATH, 'utf-8')
+      res.json({ content })
+    } else {
+      res.json({ content: '' })
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/context', (req, res) => {
+  try {
+    const { content } = req.body
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'content must be a string' })
+    }
+    fs.writeFileSync(CONTEXT_PATH, content, 'utf-8')
+    res.json({ saved: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Web clipper — POST /api/clip to capture content from bookmarklet/extension
+app.post('/api/clip', (req, res) => {
+  try {
+    const { title, content, url, tags } = req.body
+    if (!title || !content) return res.status(400).json({ error: 'title and content required' })
+
+    const now = new Date().toISOString()
+    const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
+    let filename = `clip-${slug}.md`
+    const filePath = path.join(VAULT_DIR, filename)
+    if (fs.existsSync(filePath)) filename = `clip-${slug}-${Date.now().toString(36)}.md`
+
+    const tagStr = (tags || ['clip']).join(', ')
+    const urlLine = url ? `source: "${url}"\n` : ''
+    const noteContent = `---\ntitle: "${title.replace(/"/g, '\\"')}"\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
+
+    fs.writeFileSync(path.join(VAULT_DIR, filename), noteContent, 'utf-8')
+    res.json({ filename, title })
+  } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 // API routes

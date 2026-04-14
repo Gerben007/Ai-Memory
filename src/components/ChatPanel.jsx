@@ -4,12 +4,19 @@ import { renderMarkdown } from '../lib/markdownParser'
 import { chatCompletion } from '../lib/api'
 import SourceCitation from './SourceCitation'
 
-function buildSystemPrompt(retrievedChunks) {
+function buildSystemPrompt(retrievedChunks, vaultContext) {
   let prompt = `You are a helpful AI assistant with access to the user's personal knowledge vault.
 Answer questions based on the provided context. If the context doesn't contain relevant information, say so honestly.
 Always cite your sources using [Source: filename > heading] format when referencing specific information from the context.
 
 `
+
+  if (vaultContext) {
+    prompt += '=== VAULT PROFILE ===\n'
+    prompt += 'The following is a high-level profile of the user\'s vault, describing their key topics, projects, and interests:\n\n'
+    prompt += vaultContext + '\n\n'
+    prompt += '=== END VAULT PROFILE ===\n\n'
+  }
 
   if (retrievedChunks.length > 0) {
     prompt += '=== RETRIEVED CONTEXT ===\n\n'
@@ -34,6 +41,7 @@ export default function ChatPanel() {
   const model = useStore(s => s.model)
   const search = useStore(s => s.search)
   const setActiveView = useStore(s => s.setActiveView)
+  const vaultContext = useStore(s => s.vaultContext)
 
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -70,8 +78,8 @@ export default function ChatPanel() {
       score: r.score
     }))
 
-    // Build system prompt with retrieved chunks
-    const systemPrompt = buildSystemPrompt(results)
+    // Build system prompt with retrieved chunks and vault context
+    const systemPrompt = buildSystemPrompt(results, vaultContext)
 
     // Prepare messages for API (last 10 pairs max)
     const recentMessages = chatMessages

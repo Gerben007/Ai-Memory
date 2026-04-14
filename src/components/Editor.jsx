@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
-import { getTagColor, getTags, getTagParts, suggestTags, getAllTagsWithCounts, buildTagTree } from '../lib/tagUtils'
+import { getTagColor, getTags, getTagParts, suggestTags, getAllTagsWithCounts, buildTagTree, getTitle } from '../lib/tagUtils'
+import { extractWikilinks } from '../lib/wikilinkParser'
 import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 import TagPill from './TagPill'
 import RelatedNotes from './RelatedNotes'
@@ -33,6 +34,7 @@ export default function Editor() {
   const [splitResult, setSplitResult] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [autoTagging, setAutoTagging] = useState(false)
+  const [linkSuggestions, setLinkSuggestions] = useState([])
   const previewRef = useRef(null)
   const tagInputRef = useRef(null)
 
@@ -46,6 +48,7 @@ export default function Editor() {
       setSaveStatus('')
       setShowSplitConfirm(false)
       setSplitResult(null)
+      setLinkSuggestions([])
     }
   }, [activeNoteFilename]) // intentionally only depend on filename
 
@@ -76,6 +79,35 @@ export default function Editor() {
     return `${frontmatter}\n\n${bodyText}\n`
   }, [activeNote])
 
+  // Detect possible wikilink targets in body text
+  const detectPossibleLinks = useCallback((bodyText) => {
+    const existingLinks = extractWikilinks(bodyText).map(l => l.target.toLowerCase())
+    const suggestions = []
+
+    for (const note of notes) {
+      if (note.filename === activeNoteFilename) continue
+      const noteTitle = getTitle(note)
+      if (!noteTitle || noteTitle.length < 2) continue
+
+      // Skip if already linked
+      if (existingLinks.includes(noteTitle.toLowerCase())) continue
+
+      // Whole-word, case-insensitive match
+      const escaped = noteTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i')
+      const match = bodyText.match(regex)
+      if (match) {
+        suggestions.push({
+          title: noteTitle,
+          filename: note.filename,
+          matchText: match[0]
+        })
+      }
+    }
+
+    return suggestions
+  }, [notes, activeNoteFilename])
+
   // Manual save
   const handleManualSave = useCallback(async () => {
     if (!activeNoteFilename) return
@@ -85,12 +117,14 @@ export default function Editor() {
       setSaveStatus('Saved!')
       setDirty(false)
       setTimeout(() => setSaveStatus(''), 3000)
+      const suggestions = detectPossibleLinks(body)
+      setLinkSuggestions(suggestions)
     } catch (err) {
       console.error('Save failed:', err)
       setSaveStatus('Save failed')
       setTimeout(() => setSaveStatus(''), 4000)
     }
-  }, [activeNoteFilename, body, title, tags, buildContent, saveNote])
+  }, [activeNoteFilename, body, title, tags, buildContent, saveNote, detectPossibleLinks])
 
   // Auto-save
   const doSave = useCallback(async (bodyText, titleText, tagsText) => {
@@ -101,12 +135,14 @@ export default function Editor() {
       setSaveStatus('Auto-saved')
       setDirty(false)
       setTimeout(() => setSaveStatus(''), 2000)
+      const suggestions = detectPossibleLinks(bodyText)
+      setLinkSuggestions(suggestions)
     } catch (err) {
       console.error('Auto-save failed:', err)
       setSaveStatus('Auto-save failed')
       setTimeout(() => setSaveStatus(''), 3000)
     }
-  }, [activeNoteFilename, buildContent, saveNote])
+  }, [activeNoteFilename, buildContent, saveNote, detectPossibleLinks])
 
   const { triggerSave } = useAutoSave(doSave)
 
@@ -736,6 +772,72 @@ Rules:
               </div>
               <button onClick={() => setSplitResult(null)} className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>Dismiss</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Wikilink suggestions banner ───────────────────────── */}
+      {linkSuggestions.length > 0 && (
+        <div
+          className="shrink-0 px-5 py-2.5 animate-fadeIn"
+          style={{
+            background: 'var(--bg-panel)',
+            borderBottom: '1px solid var(--border)',
+          }}
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className="text-[11px] font-medium shrink-0"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Link to:
+            </span>
+            {linkSuggestions.map((s) => (
+              <button
+                key={s.filename}
+                onClick={() => {
+                  const escaped = s.matchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                  const regex = new RegExp(`\\b${escaped}\\b`, 'i')
+                  const newBody = body.replace(regex, `[[${s.title}]]`)
+                  setBody(newBody)
+                  setDirty(true)
+                  setLinkSuggestions(prev => prev.filter(x => x.filename !== s.filename))
+                  const content = buildContent(newBody, title, tags)
+                  saveNote(activeNoteFilename, content).then(() => {
+                    setSaveStatus('Saved!')
+                    setDirty(false)
+                    setTimeout(() => setSaveStatus(''), 3000)
+                  })
+                }}
+                className="text-[12px] px-2.5 py-1 rounded-lg transition-all"
+                style={{
+                  border: '1px solid var(--border)',
+                  color: 'var(--accent-hi)',
+                  background: 'var(--accent-soft)',
+                  cursor: 'pointer',
+                }}
+                onMouseOver={e => {
+                  e.currentTarget.style.borderColor = 'var(--accent-hi)'
+                  e.currentTarget.style.background = 'var(--accent-soft)'
+                }}
+                onMouseOut={e => {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.background = 'var(--accent-soft)'
+                }}
+              >
+                [[{s.title}]]
+              </button>
+            ))}
+            <button
+              onClick={() => setLinkSuggestions([])}
+              className="ml-auto text-[11px] transition-colors"
+              style={{ color: 'var(--text-muted)', padding: '0 4px' }}
+              onMouseOver={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}
+              title="Dismiss suggestions"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
