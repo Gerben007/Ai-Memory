@@ -6,7 +6,14 @@ import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
-import { createImportRoutes } from './importRoutes.js'
+// Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
+let createImportRoutes = null
+try {
+  const mod = await import('./importRoutes.js')
+  createImportRoutes = mod.createImportRoutes
+} catch (err) {
+  console.warn('[Import] File import disabled — native dependency error:', err.message)
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -56,7 +63,9 @@ app.post('/api/config', (req, res) => {
 app.use('/api/notes', createFileRoutes(VAULT_DIR))
 app.use('/api/chat', createAnthropicProxy())
 app.use('/api', createSearchRoutes(VAULT_DIR))
-app.use('/api/import', createImportRoutes(VAULT_DIR))
+if (createImportRoutes) {
+  app.use('/api/import', createImportRoutes(VAULT_DIR))
+}
 
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {

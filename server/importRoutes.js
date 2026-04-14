@@ -2,10 +2,21 @@ import { Router } from 'express'
 import multer from 'multer'
 import fs from 'fs/promises'
 import path from 'path'
-import { PDFParse } from 'pdf-parse'
-import XLSX from 'xlsx'
-import mammoth from 'mammoth'
-import { simpleParser } from 'mailparser'
+
+// Native-heavy deps loaded lazily to avoid SIGILL on older CPUs (Alpine + older Xeon etc.)
+let _PDFParse, _XLSX, _mammoth, _simpleParser
+async function loadParser(name) {
+  try {
+    switch (name) {
+      case 'pdf':    if (!_PDFParse)    _PDFParse    = (await import('pdf-parse')).PDFParse;    return _PDFParse
+      case 'xlsx':   if (!_XLSX)         _XLSX        = (await import('xlsx')).default;          return _XLSX
+      case 'mammoth':if (!_mammoth)      _mammoth     = (await import('mammoth')).default;       return _mammoth
+      case 'email':  if (!_simpleParser) _simpleParser= (await import('mailparser')).simpleParser;return _simpleParser
+    }
+  } catch (e) {
+    throw new Error(`${name} parser not available on this system: ${e.message}`)
+  }
+}
 
 const MAX_CHUNK = 6000 // chars per AI chunk
 
@@ -168,6 +179,7 @@ Return ONLY the JSON array, no other text.`
 // ── Text extraction functions ─────────────────────────────────────────
 
 async function extractPDF(filePath) {
+  const PDFParse = await loadParser('pdf')
   const parser = new PDFParse({})
   await parser.load(filePath)
   const info = await parser.getInfo().catch(() => ({}))
@@ -198,6 +210,7 @@ async function extractPDF(filePath) {
 }
 
 async function extractSpreadsheet(filePath, ext) {
+  const XLSX = await loadParser('xlsx')
   const workbook = XLSX.readFile(filePath)
   const sections = []
   for (const sheetName of workbook.SheetNames) {
@@ -218,6 +231,7 @@ async function extractSpreadsheet(filePath, ext) {
 }
 
 async function extractDocx(filePath) {
+  const mammoth = await loadParser('mammoth')
   const buffer = await fs.readFile(filePath)
   const result = await mammoth.convertToMarkdown({ buffer })
   const text = result.value
@@ -234,6 +248,7 @@ async function extractDocx(filePath) {
 }
 
 async function extractEmail(filePath) {
+  const simpleParser = await loadParser('email')
   const raw = await fs.readFile(filePath)
   const parsed = await simpleParser(raw)
   const title = parsed.subject || 'Untitled Email'
