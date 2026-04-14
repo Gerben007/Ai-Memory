@@ -15,4 +15,5 @@ services:
 
 volumes:
   vault-data:
-    driver: local
+    external: true
+    name: ai-knowledge_vault-data
