@@ -1,18 +1,8 @@
 import { useState } from 'react'
 import { useStore, TEMPLATES } from '../lib/store'
-import { getTagColor, getAllTagsWithCounts } from '../lib/tagUtils'
+import { getTags, getAllTagsWithCounts } from '../lib/tagUtils'
 import TagCleanup from './TagCleanup'
 import TagPill from './TagPill'
-
-const NAV_ITEMS = [
-  { key: 'editor', label: 'Notes', icon: '📝' },
-  { key: 'chat', label: 'AI Chat', icon: '💬' },
-  { key: 'brainstorm', label: 'Brainstorm', icon: '🧠' },
-  { key: 'import', label: 'Import', icon: '📥' },
-  { key: 'graph', label: 'Graph', icon: '🕸️' },
-  { key: 'agent', label: 'Agent API', icon: '🤖' },
-  { key: 'settings', label: 'Settings', icon: '⚙️' }
-]
 
 export default function Sidebar({ onNavigate }) {
   const notes = useStore(s => s.notes)
@@ -29,16 +19,11 @@ export default function Sidebar({ onNavigate }) {
 
   const [searchQuery, setSearchQuery] = useState('')
   const [showNewNote, setShowNewNote] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
   const [newNoteTitle, setNewNoteTitle] = useState('')
-  const [templateKey, setTemplateKey] = useState(null)
-  const [templateTitle, setTemplateTitle] = useState('')
   const [quickText, setQuickText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [captureStatus, setCaptureStatus] = useState('')
   const [showTagCleanup, setShowTagCleanup] = useState(false)
-
-  const tagCount = getAllTagsWithCounts(notes).size
 
   let displayedNotes = notes
   if (searchQuery.trim()) {
@@ -48,16 +33,11 @@ export default function Sidebar({ onNavigate }) {
   }
 
   const handleCreate = () => {
-    if (newNoteTitle.trim()) { createNote(newNoteTitle.trim()); setNewNoteTitle(''); setShowNewNote(false) }
-  }
-
-  const handleTemplateCreate = () => {
-    if (templateKey === 'daily') {
-      createFromTemplate('daily')
-      setTemplateKey(null); setShowTemplates(false); onNavigate?.()
-    } else if (templateTitle.trim()) {
-      createFromTemplate(templateKey, templateTitle.trim())
-      setTemplateTitle(''); setTemplateKey(null); setShowTemplates(false); onNavigate?.()
+    if (newNoteTitle.trim()) {
+      createNote(newNoteTitle.trim())
+      setNewNoteTitle('')
+      setShowNewNote(false)
+      onNavigate?.()
     }
   }
 
@@ -74,176 +54,255 @@ export default function Sidebar({ onNavigate }) {
     if (note) { setActiveNote(note.filename); onNavigate?.() }
   }
 
-  const handleNoteClick = (filename) => { setActiveNote(filename); onNavigate?.() }
-  const handleNavClick = (key) => { setActiveView(key); onNavigate?.() }
-  const handleDelete = (filename) => { deleteNote(filename); setConfirmDelete(null) }
+  const handleNoteClick = (filename) => {
+    setActiveNote(filename)
+    setActiveView('editor')
+    onNavigate?.()
+  }
+
+  const handleDelete = (filename) => {
+    deleteNote(filename)
+    setConfirmDelete(null)
+  }
+
+  // Get preview text from note body
+  const getPreview = (note) => {
+    if (!note.body) return ''
+    return note.body
+      .replace(/^#+\s+.+$/gm, '')          // remove headings
+      .replace(/!\[.*?\]\(.*?\)/g, '')      // remove images
+      .replace(/\[.*?\]\(.*?\)/g, '$1')     // flatten links
+      .replace(/[*_`~]/g, '')              // remove markdown syntax
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 80)
+  }
 
   return (
-    <aside className="w-full h-full bg-[var(--bg-secondary)] border-r border-white/5 flex flex-col relative z-10">
-      {/* Header */}
-      <div className="p-4 border-b border-white/5">
-        <h1 className="text-lg font-bold text-gradient">Knowledge Vault</h1>
-        <p className="text-[10px] text-[var(--text-muted)] mt-0.5">{notes.length} notes</p>
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── Header ───────────────────────────────────────────── */}
+      <div className="px-4 py-3 shrink-0 flex items-center justify-between"
+        style={{ borderBottom: '1px solid var(--border)' }}>
+        <div>
+          <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Notes
+          </div>
+          <div className="text-[10px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {notes.length} {notes.length === 1 ? 'note' : 'notes'}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => createFromTemplate('daily')}
+            className="nav-icon"
+            data-label="Today's note"
+            title="Today's note"
+            style={{ width: 28, height: 28 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </button>
+          <button
+            onClick={handleRandom}
+            className="nav-icon"
+            data-label="Random note"
+            title="Random note"
+            style={{ width: 28, height: 28 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+              <polyline points="21 16 21 21 16 21"/>
+              <line x1="15" y1="15" x2="21" y2="21"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowTagCleanup(true)}
+            className="nav-icon"
+            data-label="Tag cleanup"
+            title="Tag cleanup"
+            style={{ width: 28, height: 28 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+              <line x1="7" y1="7" x2="7.01" y2="7"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      {/* Quick Capture */}
-      <div className="p-3 border-b border-white/5">
+      {/* ── Quick capture ────────────────────────────────────── */}
+      <div className="px-3 py-2.5 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex gap-1.5">
           <input
             type="text"
             value={quickText}
             onChange={e => setQuickText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleQuickCapture()}
-            placeholder="Quick capture..."
-            className="flex-1 input-glass text-xs"
+            placeholder="Quick capture…"
+            className="flex-1 input-glass"
+            style={{ paddingTop: 7, paddingBottom: 7 }}
           />
-          <button onClick={handleQuickCapture} className="btn-primary text-xs px-2.5 py-2 shrink-0">
-            +
+          <button
+            onClick={handleQuickCapture}
+            className="btn-primary shrink-0"
+            style={{ padding: '7px 10px', borderRadius: 8 }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
-        {captureStatus && <p className="text-[10px] text-amber-400 mt-1">{captureStatus}</p>}
+        {captureStatus && (
+          <p className="text-[10px] mt-1" style={{ color: 'var(--green)' }}>{captureStatus}</p>
+        )}
       </div>
 
-      {/* Action buttons */}
-      <div className="p-3 border-b border-white/5 flex gap-2">
-        <button
-          onClick={() => createFromTemplate('daily')}
-          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
-        >
-          📅 Today
-        </button>
-        <button
-          onClick={handleRandom}
-          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
-        >
-          🎲 Random
-        </button>
-        <button
-          onClick={() => setShowTagCleanup(true)}
-          className="flex-1 text-[11px] btn-secondary py-2 flex items-center justify-center gap-1"
-          title={`${tagCount} tags — clean up, merge, rename`}
-        >
-          🏷 Tags
-        </button>
+      {/* ── Search ───────────────────────────────────────────── */}
+      <div className="px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="relative">
+          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ color: 'var(--text-muted)' }}>
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search notes…"
+            className="input-glass w-full"
+            style={{ paddingLeft: 28, paddingTop: 6, paddingBottom: 6, fontSize: 12 }}
+          />
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="p-3 border-b border-white/5">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search notes..."
-          className="w-full input-glass text-sm"
-        />
-      </div>
-
-      {/* New Note / Templates */}
-      <div className="p-3 border-b border-white/5">
-        {templateKey ? (
-          <div className="space-y-2">
-            <div className="text-[10px] text-gray-500 uppercase tracking-wider">{TEMPLATES[templateKey].icon} {TEMPLATES[templateKey].label}</div>
-            {templateKey !== 'daily' && (
-              <input
-                type="text"
-                value={templateTitle}
-                onChange={e => setTemplateTitle(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleTemplateCreate()}
-                placeholder="Title..."
-                className="w-full input-glass text-sm py-1.5"
-                autoFocus
-              />
-            )}
-            <div className="flex gap-2">
-              <button onClick={handleTemplateCreate} className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-500">Create</button>
-              <button onClick={() => { setTemplateKey(null); setTemplateTitle('') }} className="text-xs text-gray-400 hover:text-gray-200">&times; Cancel</button>
-            </div>
-          </div>
-        ) : showTemplates ? (
-          <div className="space-y-1">
-            {Object.entries(TEMPLATES).map(([key, tmpl]) => (
-              <button
-                key={key}
-                onClick={() => { if (key === 'daily') { createFromTemplate('daily'); setShowTemplates(false); onNavigate?.() } else { setTemplateKey(key) } }}
-                className="w-full text-left text-xs btn-secondary px-3 py-2 flex items-center gap-2"
-              >
-                <span>{tmpl.icon}</span><span>{tmpl.label}</span>
-              </button>
-            ))}
-            <button onClick={() => setShowTemplates(false)} className="w-full text-xs text-gray-500 hover:text-gray-300 py-1">Cancel</button>
-          </div>
-        ) : showNewNote ? (
-          <div className="flex gap-2">
+      {/* ── New note bar ─────────────────────────────────────── */}
+      <div className="px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+        {showNewNote ? (
+          <div className="flex gap-1.5">
             <input
-              type="text" value={newNoteTitle} onChange={e => setNewNoteTitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()} placeholder="Note title..."
-              className="flex-1 input-glass text-sm py-1.5"
+              type="text"
+              value={newNoteTitle}
+              onChange={e => setNewNoteTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCreate()
+                if (e.key === 'Escape') { setShowNewNote(false); setNewNoteTitle('') }
+              }}
+              placeholder="Note title…"
+              className="flex-1 input-glass text-xs"
+              style={{ paddingTop: 6, paddingBottom: 6 }}
               autoFocus
             />
-            <button onClick={handleCreate} className="btn-primary text-sm">Add</button>
-            <button onClick={() => { setShowNewNote(false); setNewNoteTitle('') }} className="text-sm text-gray-400 hover:text-gray-200 px-1">&times;</button>
+            <button onClick={handleCreate} className="btn-primary text-xs" style={{ padding: '6px 10px' }}>Add</button>
+            <button
+              onClick={() => { setShowNewNote(false); setNewNoteTitle('') }}
+              style={{ color: 'var(--text-muted)', fontSize: 16, padding: '0 4px' }}
+            >&times;</button>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <button onClick={() => setShowNewNote(true)} className="flex-1 text-xs btn-secondary py-2 border-dashed">
-              + New Note
-            </button>
-            <button onClick={() => setShowTemplates(true)} className="text-xs btn-secondary px-3 py-2">
-              📋
-            </button>
-          </div>
+          <button
+            onClick={() => setShowNewNote(true)}
+            className="w-full text-xs flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)', border: '1px dashed var(--border)' }}
+            onMouseOver={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+            onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New note
+          </button>
         )}
       </div>
 
-      {/* Note List */}
+      {/* ── Note list ────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto">
         {displayedNotes.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500 text-center">{searchQuery ? 'No matching notes' : 'No notes yet'}</div>
+          <div className="p-6 text-center" style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+            {searchQuery ? 'No matching notes' : 'No notes yet'}
+          </div>
         ) : (
-          displayedNotes.map(note => (
-            <div
-              key={note.filename}
-              className={`group relative px-4 py-3 cursor-pointer border-b border-white/5/50 hover:bg-white/[0.03] active:bg-white/[0.05] ${
-                activeNoteFilename === note.filename && activeView === 'editor' ? 'bg-[var(--accent-soft)] border-l-2 border-l-[var(--accent)]' : ''
-              }`}
-              onClick={() => handleNoteClick(note.filename)}
-            >
-              <div className="text-sm font-medium text-gray-200 truncate pr-6">
-                {note.frontmatter?.title || note.filename.replace(/\.md$/, '')}
+          displayedNotes.map(note => {
+            const isActive = activeNoteFilename === note.filename && activeView === 'editor'
+            const noteTags = getTags(note)
+            const preview = getPreview(note)
+            const dateStr = note.frontmatter?.updated || note.frontmatter?.created
+            const displayDate = dateStr
+              ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : ''
+
+            return (
+              <div
+                key={note.filename}
+                className={`note-card group ${isActive ? 'active' : ''}`}
+                onClick={() => handleNoteClick(note.filename)}
+                style={isActive ? { borderLeftWidth: 2, borderLeftColor: 'var(--accent)', paddingLeft: 12 } : {}}
+              >
+                <div className="flex items-start justify-between gap-1">
+                  <div className="note-card-title flex-1">
+                    {note.frontmatter?.title || note.filename.replace(/\.md$/, '')}
+                  </div>
+                  {displayDate && (
+                    <span className="text-[10px] shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {displayDate}
+                    </span>
+                  )}
+                </div>
+
+                {preview && (
+                  <div className="note-card-preview">{preview}</div>
+                )}
+
+                {noteTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {noteTags.slice(0, 3).map(tag => (
+                      <TagPill key={tag} tag={tag} />
+                    ))}
+                    {noteTags.length > 3 && (
+                      <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                        +{noteTags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Delete button */}
+                {confirmDelete === note.filename ? (
+                  <div className="flex gap-1 mt-1.5">
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(note.filename) }}
+                      className="text-[10px] px-2 py-0.5 rounded"
+                      style={{ background: 'var(--red)', color: '#fff' }}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDelete(null) }}
+                      className="text-[10px] px-2 py-0.5 rounded"
+                      style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDelete(note.filename) }}
+                    className="absolute right-2 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: 'var(--text-muted)', fontSize: 12 }}
+                    title="Delete"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                  </button>
+                )}
               </div>
-              {note.frontmatter?.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {note.frontmatter.tags.slice(0, 3).map(tag => (
-                    <TagPill key={tag} tag={tag} />
-                  ))}
-                  {note.frontmatter.tags.length > 3 && <span className="text-[10px] text-gray-500">+{note.frontmatter.tags.length - 3}</span>}
-                </div>
-              )}
-              {confirmDelete === note.filename ? (
-                <div className="absolute right-2 top-2 flex gap-1">
-                  <button onClick={e => { e.stopPropagation(); handleDelete(note.filename) }} className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded">Delete</button>
-                  <button onClick={e => { e.stopPropagation(); setConfirmDelete(null) }} className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded">Cancel</button>
-                </div>
-              ) : (
-                <button onClick={e => { e.stopPropagation(); setConfirmDelete(note.filename) }} className="absolute right-2 top-3 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-sm">🗑</button>
-              )}
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
-      {/* Desktop nav */}
-      <nav className="border-t border-white/5 p-2 hidden md:block">
-        {NAV_ITEMS.map(item => (
-          <button key={item.key} onClick={() => handleNavClick(item.key)}
-            className={`w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2 ${activeView === item.key ? 'bg-[var(--accent-soft)] text-[var(--accent)]' : 'text-[var(--text-muted)] hover:bg-white/[0.03] hover:text-[var(--text-primary)]'}`}
-          >
-            <span>{item.icon}</span><span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
-
       {showTagCleanup && <TagCleanup onClose={() => setShowTagCleanup(false)} />}
-    </aside>
+    </div>
   )
 }

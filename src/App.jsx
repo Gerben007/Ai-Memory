@@ -9,12 +9,80 @@ import AgentPanel from './components/AgentPanel'
 import ImportPanel from './components/ImportPanel'
 import Settings from './components/Settings'
 
+// SVG icon components
+const Icons = {
+  notes: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  ),
+  chat: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+  ),
+  brainstorm: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.44-4.66Z"/>
+      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.44-4.66Z"/>
+    </svg>
+  ),
+  graph: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+    </svg>
+  ),
+  agent: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+  import: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  ),
+  settings: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  ),
+  menu: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  )
+}
+
 const NAV_ITEMS = [
-  { key: 'editor', label: 'Notes', icon: '📝' },
-  { key: 'chat', label: 'Chat', icon: '💬' },
-  { key: 'brainstorm', label: 'Brain', icon: '🧠' },
-  { key: 'graph', label: 'Graph', icon: '🕸️' },
-  { key: 'settings', label: 'Settings', icon: '⚙️' }
+  { key: 'editor',    label: 'Notes',     icon: Icons.notes },
+  { key: 'chat',      label: 'AI Chat',   icon: Icons.chat },
+  { key: 'brainstorm',label: 'Brainstorm',icon: Icons.brainstorm },
+  { key: 'graph',     label: 'Graph',     icon: Icons.graph },
+  { key: 'import',    label: 'Import',    icon: Icons.import },
+  { key: 'agent',     label: 'Agent API', icon: Icons.agent },
+  { key: 'settings',  label: 'Settings',  icon: Icons.settings },
+]
+
+// Mobile bottom nav — fewer items
+const MOBILE_NAV = [
+  { key: 'editor',    label: 'Notes',    icon: Icons.notes },
+  { key: 'chat',      label: 'Chat',     icon: Icons.chat },
+  { key: 'graph',     label: 'Graph',    icon: Icons.graph },
+  { key: 'import',    label: 'Import',   icon: Icons.import },
+  { key: 'settings',  label: 'Settings', icon: Icons.settings },
 ]
 
 export default function App() {
@@ -24,7 +92,7 @@ export default function App() {
   const loadConfig = useStore(s => s.loadConfig)
   const rebuildIndex = useStore(s => s.rebuildIndex)
   const initialized = useStore(s => s.initialized)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -37,66 +105,115 @@ export default function App() {
 
   const handleNavClick = (view) => {
     setActiveView(view)
-    setSidebarOpen(false)
+    setPanelOpen(false)
   }
 
   if (!initialized) {
     return (
       <div className="h-dvh flex items-center justify-center app-bg">
-        <div className="text-gradient text-2xl font-bold">Knowledge Vault</div>
+        <div className="text-center">
+          <div className="text-gradient text-xl font-semibold tracking-tight mb-1">Knowledge Vault</div>
+          <div className="text-xs text-[var(--text-muted)] tracking-widest uppercase">Loading</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-dvh flex flex-col app-bg text-gray-100 overflow-hidden">
-      <div className="flex-1 flex overflow-hidden relative">
-        <div className={`
-          fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-200 ease-out
-          md:relative md:translate-x-0 md:w-64 md:z-auto
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        `}>
-          <Sidebar onNavigate={() => setSidebarOpen(false)} />
+    <div className="h-dvh flex app-bg overflow-hidden">
+
+      {/* ── Desktop icon strip nav ──────────────────────────────── */}
+      <nav
+        className="hidden md:flex flex-col shrink-0 z-20"
+        style={{ width: 'var(--nav-w)', background: 'var(--bg-nav)', borderRight: '1px solid var(--border)' }}
+      >
+        {/* Logo mark */}
+        <div className="flex items-center justify-center h-12 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+          <div className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold"
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent-hi)', border: '1px solid rgba(212,144,10,0.25)' }}>
+            KV
+          </div>
         </div>
 
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
-
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 glass-strong md:hidden">
-            <button onClick={() => setSidebarOpen(true)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+        {/* Nav icons */}
+        <div className="flex-1 flex flex-col items-center gap-1 py-3 px-1">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.key}
+              onClick={() => handleNavClick(item.key)}
+              className={`nav-icon ${activeView === item.key ? 'active' : ''}`}
+              data-label={item.label}
+              title={item.label}
+            >
+              {item.icon}
             </button>
-            <span className="text-sm font-semibold text-gradient">Knowledge Vault</span>
-            <div className="w-7" />
-          </div>
+          ))}
+        </div>
+      </nav>
 
-          <div className="flex-1 overflow-hidden">
-            {activeView === 'editor' && <Editor />}
-            {activeView === 'chat' && <ChatPanel />}
-            {activeView === 'brainstorm' && <BrainstormPanel />}
-
-            {activeView === 'graph' && <GraphView />}
-            {activeView === 'agent' && <AgentPanel />}
-            {activeView === 'import' && <ImportPanel />}
-            {activeView === 'settings' && <Settings />}
-          </div>
-        </main>
+      {/* ── Note list panel ─────────────────────────────────────── */}
+      {/* Only visible when editor is active on desktop, always slide-in on mobile */}
+      <div className={`
+        fixed md:relative inset-y-0 left-0 z-40 flex flex-col
+        transform transition-transform duration-200 ease-out
+        ${panelOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `} style={{ width: 'var(--panel-w)', background: 'var(--bg-panel)', borderRight: '1px solid var(--border)' }}>
+        <Sidebar onNavigate={() => setPanelOpen(false)} />
       </div>
 
-      <nav className="flex border-t border-white/5 glass-strong md:hidden shrink-0 relative z-10">
-        {NAV_ITEMS.map(item => (
+      {/* Backdrop for mobile panel */}
+      {panelOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 md:hidden"
+          onClick={() => setPanelOpen(false)}
+        />
+      )}
+
+      {/* ── Main content ────────────────────────────────────────── */}
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+        {/* Mobile top bar */}
+        <div
+          className="flex items-center gap-3 px-4 py-2.5 shrink-0 md:hidden"
+          style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)' }}
+        >
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {Icons.menu}
+          </button>
+          <span className="flex-1 text-sm font-semibold text-gradient">Knowledge Vault</span>
+        </div>
+
+        {/* View content */}
+        <div className="flex-1 overflow-hidden">
+          {activeView === 'editor'     && <Editor />}
+          {activeView === 'chat'       && <ChatPanel />}
+          {activeView === 'brainstorm' && <BrainstormPanel />}
+          {activeView === 'graph'      && <GraphView />}
+          {activeView === 'agent'      && <AgentPanel />}
+          {activeView === 'import'     && <ImportPanel />}
+          {activeView === 'settings'   && <Settings />}
+        </div>
+      </main>
+
+      {/* ── Mobile bottom nav ───────────────────────────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 flex shrink-0 z-20"
+        style={{ background: 'var(--bg-nav)', borderTop: '1px solid var(--border)' }}
+      >
+        {MOBILE_NAV.map(item => (
           <button
             key={item.key}
             onClick={() => handleNavClick(item.key)}
-            className={`flex-1 flex flex-col items-center py-2.5 text-[10px] gap-0.5 transition-colors ${
-              activeView === item.key ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
-            }`}
+            className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
+            style={{ color: activeView === item.key ? 'var(--accent-hi)' : 'var(--text-muted)' }}
           >
-            <span className="text-base">{item.icon}</span>
-            <span>{item.label}</span>
-            {activeView === item.key && <span className="w-1 h-1 rounded-full bg-[var(--accent)] mt-0.5" />}
+            <span className="scale-90">{item.icon}</span>
+            <span className="text-[9.5px] font-medium">{item.label}</span>
+            {activeView === item.key && (
+              <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent)' }} />
+            )}
           </button>
         ))}
       </nav>

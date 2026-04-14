@@ -322,10 +322,13 @@ Rules:
 
   if (!activeNote) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
         <div className="text-center">
-          <div className="text-5xl mb-4 opacity-30">📝</div>
-          <p className="text-sm">Select a note or create a new one</p>
+          <svg className="mx-auto mb-3 opacity-20" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <p className="text-xs">Select a note or create a new one</p>
         </div>
       </div>
     )
@@ -336,68 +339,105 @@ Rules:
   const canSplit = detectSections.length >= 2
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="border-b border-gray-800 px-3 py-2 md:px-5 md:py-3 bg-gray-900/50">
-        <div className="flex items-center gap-2 md:gap-3">
+    <div className="flex flex-col h-full" style={{ background: 'var(--bg-base)' }}>
+
+      {/* ── Toolbar ─────────────────────────────────────────────── */}
+      <div className="shrink-0 px-5 pt-4 pb-0" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-panel)' }}>
+
+        {/* Title row */}
+        <div className="flex items-center gap-3 pb-3">
           <input
             type="text"
             value={title}
             onChange={handleTitleChange}
-            className="flex-1 min-w-0 bg-transparent text-base md:text-lg font-semibold text-gray-100 focus:outline-none border-b border-transparent focus:border-indigo-500 pb-0.5"
-            placeholder="Note title"
+            className="flex-1 min-w-0 bg-transparent font-semibold focus:outline-none"
+            style={{
+              fontSize: 17,
+              color: 'var(--text-primary)',
+              borderBottom: '1px solid transparent',
+              paddingBottom: 1,
+              letterSpacing: '-0.02em'
+            }}
+            onFocus={e => e.target.style.borderBottomColor = 'var(--accent)'}
+            onBlur={e => e.target.style.borderBottomColor = 'transparent'}
+            placeholder="Untitled"
           />
-          <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+
+          {/* Status */}
+          <div className="flex items-center gap-2 shrink-0">
             {saveStatus && (
-              <span className="text-[10px] md:text-xs text-green-400">{saveStatus}</span>
+              <span className="text-[11px] font-medium" style={{ color: 'var(--green)' }}>{saveStatus}</span>
             )}
             {dirty && !saveStatus && (
-              <span className="text-[10px] md:text-xs text-amber-400 hidden sm:inline">Unsaved</span>
+              <span className="text-[11px] hidden sm:inline" style={{ color: 'var(--amber)' }}>Unsaved</span>
             )}
+
+            {/* Auto-tag */}
             <button
               onClick={handleAutoTag}
               disabled={autoTagging || !body.trim()}
-              className="text-[11px] md:text-xs px-2 md:px-3 py-1.5 rounded-lg border border-indigo-700/50 text-indigo-400 hover:text-indigo-300 hover:border-indigo-500/50 disabled:opacity-30 hidden sm:inline-flex items-center gap-1"
+              className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+              style={{
+                border: '1px solid var(--border)',
+                color: 'var(--accent-hi)',
+                background: 'var(--accent-soft)',
+                opacity: (autoTagging || !body.trim()) ? 0.35 : 1
+              }}
               title="Auto-generate tags from content"
             >
-              {autoTagging ? '...' : '✨ Auto-tag'}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              {autoTagging ? 'Tagging…' : 'Auto-tag'}
             </button>
+
+            {/* Split */}
             {canSplit && (
               <button
                 onClick={() => setShowSplitConfirm(true)}
-                className="text-[11px] md:text-xs px-2 md:px-3 py-1.5 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-400 hover:border-amber-500/50 hidden sm:inline-flex items-center gap-1"
+                className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+                style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'transparent' }}
                 title={`Split into ${detectSections.length} notes`}
               >
-                ✂ Split
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                Split
               </button>
             )}
+
+            {/* Save */}
             <button
               onClick={handleManualSave}
-              className="text-[11px] md:text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-500 font-medium"
+              className="btn-primary text-[11px]"
+              style={{ padding: '6px 14px' }}
             >
               Save
             </button>
+
+            {/* Preview toggle */}
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className={`text-[11px] md:text-xs px-2 md:px-3 py-1.5 rounded-lg border hidden sm:inline-flex ${
-                showPreview
-                  ? 'bg-gray-800 border-gray-600 text-gray-300'
-                  : 'border-gray-700 text-gray-500 hover:text-gray-300'
-              }`}
+              className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+              style={{
+                border: '1px solid var(--border)',
+                color: showPreview ? 'var(--text-primary)' : 'var(--text-muted)',
+                background: showPreview ? 'var(--bg-surface-hover)' : 'transparent'
+              }}
             >
-              Preview
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              {showPreview ? 'Preview' : 'Preview'}
             </button>
+
+            {/* Delete */}
             {confirmDelete ? (
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => { deleteNote(activeNoteFilename); setConfirmDelete(false) }}
-                  className="text-[11px] md:text-xs bg-red-600 text-white px-2 py-1.5 rounded-lg hover:bg-red-500"
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg font-medium"
+                  style={{ background: 'var(--red)', color: '#fff' }}
                 >
                   Confirm
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="text-[11px] md:text-xs text-gray-400 hover:text-gray-200 px-1"
+                  style={{ color: 'var(--text-muted)', fontSize: 16, padding: '0 6px' }}
                 >
                   &times;
                 </button>
@@ -405,105 +445,129 @@ Rules:
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="text-[11px] md:text-xs px-2 py-1.5 rounded-lg border border-gray-700 text-gray-500 hover:text-red-400 hover:border-red-500/50"
+                className="flex items-center justify-center rounded-lg transition-all"
+                style={{ width: 30, height: 30, border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                onMouseOver={e => { e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.borderColor = 'var(--red)' }}
+                onMouseOut={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border)' }}
                 title="Delete note"
               >
-                🗑
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
               </button>
             )}
           </div>
         </div>
 
-        {/* Tags row */}
-        <div className="mt-1.5 md:mt-2 flex items-center gap-2 md:gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0 relative">
-            <span className="text-[10px] md:text-[11px] text-gray-500 shrink-0">Tags:</span>
-            {/* Current tags as pills — click to see related notes */}
-            {currentTagList.map(tag => (
-              <TagPill
-                key={tag}
-                tag={tag}
-                onRemove={(t) => {
-                  const newTags = currentTagList.filter(x => x !== t).join(', ')
-                  setTags(newTags)
-                  setDirty(true)
-                  triggerSave(body, title, newTags)
-                }}
-              />
-            ))}
-            {/* Add tag button */}
+        {/* Tags + meta row */}
+        <div className="flex items-center gap-2 pb-2.5 flex-wrap min-h-[28px]">
+          <span className="text-[10px] font-medium tracking-wider uppercase shrink-0" style={{ color: 'var(--text-muted)' }}>Tags</span>
+
+          {currentTagList.map(tag => (
+            <TagPill
+              key={tag}
+              tag={tag}
+              onRemove={(t) => {
+                const newTags = currentTagList.filter(x => x !== t).join(', ')
+                setTags(newTags)
+                setDirty(true)
+                triggerSave(body, title, newTags)
+              }}
+            />
+          ))}
+
+          {/* Add tag button */}
+          <div className="relative" data-tag-picker>
             <button
               onClick={() => setShowTagSuggestions(!showTagSuggestions)}
-              className="text-[10px] px-1.5 py-0.5 rounded-full border border-dashed border-gray-700 text-gray-500 hover:text-gray-300 hover:border-gray-500 shrink-0"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors"
+              style={{
+                border: '1px dashed var(--border)',
+                color: 'var(--text-muted)'
+              }}
+              onMouseOver={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}
             >
-              + tag
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              tag
             </button>
 
             {/* Tag picker dropdown */}
             {showTagSuggestions && (
-              <div data-tag-picker className="absolute top-full left-0 mt-1 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                {/* Search input */}
-                <div className="p-2 border-b border-gray-800">
+              <div
+                data-tag-picker
+                className="absolute top-full left-0 mt-1.5 w-64 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn"
+                style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-strong)' }}
+              >
+                <div className="p-2" style={{ borderBottom: '1px solid var(--border)' }}>
                   <input
                     ref={tagInputRef}
                     type="text"
                     value={tagSearch}
                     onChange={e => setTagSearch(e.target.value)}
                     onKeyDown={e => {
-                      if (e.key === 'Enter' && tagSearch.trim()) {
-                        addTag(tagSearch.trim().toLowerCase())
-                        setTagSearch('')
-                      }
+                      if (e.key === 'Enter' && tagSearch.trim()) { addTag(tagSearch.trim().toLowerCase()); setTagSearch('') }
                       if (e.key === 'Escape') setShowTagSuggestions(false)
                     }}
-                    placeholder="Search or type new tag..."
-                    className="w-full bg-gray-800 text-xs text-gray-200 rounded-lg px-2.5 py-1.5 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+                    placeholder="Search or create tag…"
+                    className="w-full text-xs rounded-lg px-2.5 py-1.5 focus:outline-none"
+                    style={{
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-primary)',
+                    }}
                     autoFocus
                   />
                 </div>
 
-                <div className="max-h-48 overflow-y-auto">
-                  {/* Suggested tags */}
+                <div className="max-h-52 overflow-y-auto">
                   {tagSuggestions.length > 0 && (
-                    <div className="px-1 pt-1">
-                      <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">Suggested</div>
+                    <div className="px-1 pt-1.5">
+                      <div className="section-label">Suggested</div>
                       {tagSuggestions.filter(s => !tagSearch || s.tag.toLowerCase().includes(tagSearch.toLowerCase())).map(s => {
                         const parts = getTagParts(s.tag)
                         return (
                           <button
                             key={s.tag}
                             onMouseDown={e => { e.preventDefault(); addTag(s.tag); setTagSearch('') }}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-lg transition-colors"
+                            style={{ color: 'var(--text-secondary)' }}
+                            onMouseOver={e => e.currentTarget.style.background = 'var(--bg-surface)'}
+                            onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                           >
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(s.tag) }} />
-                            <span className="flex-1 text-gray-300">
-                              {parts.isHierarchical ? <><span className="text-gray-600">{parts.parent}/</span>{parts.child}</> : s.tag}
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: getTagColor(s.tag) }} />
+                            <span className="flex-1">
+                              {parts.isHierarchical
+                                ? <><span style={{ color: 'var(--text-muted)' }}>{parts.parent}/</span>{parts.child}</>
+                                : s.tag}
                             </span>
-                            <span className="text-[10px] text-gray-600">{s.count}</span>
+                            <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.count}</span>
                           </button>
                         )
                       })}
                     </div>
                   )}
 
-                  {/* All vault tags — grouped by parent */}
                   <div className="px-1 py-1">
-                    {tagSuggestions.length > 0 && <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">All tags</div>}
+                    {tagSuggestions.length > 0 && <div className="section-label">All tags</div>}
                     {(() => {
                       const filtered = allVaultTags.filter(([tag]) => !tagSearch || tag.toLowerCase().includes(tagSearch.toLowerCase()))
                       const tree = buildTagTree(new Map(filtered))
                       const items = []
                       for (const [parent, node] of tree) {
                         const hasChildren = node.children.size > 0
-                        // Show parent as group header if it has children
                         if (hasChildren) {
                           items.push(
-                            <div key={`hdr-${parent}`} className="text-[9px] uppercase tracking-wider text-gray-600 px-2 pt-2 pb-0.5 flex items-center gap-1.5">
+                            <div key={`hdr-${parent}`} className="flex items-center gap-1.5 px-2 pt-2 pb-0.5">
                               <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getTagColor(parent) }} />
-                              {parent}
+                              <span className="section-label" style={{ padding: 0 }}>{parent}</span>
                               <button
                                 onMouseDown={e => { e.preventDefault(); addTag(parent); setTagSearch('') }}
-                                className="text-gray-700 hover:text-gray-400 ml-auto"
+                                className="ml-auto text-[11px] transition-colors"
+                                style={{ color: 'var(--text-muted)' }}
+                                onMouseOver={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                                onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}
                               >+</button>
                             </div>
                           )
@@ -513,26 +577,31 @@ Rules:
                               <button
                                 key={fullTag}
                                 onMouseDown={e => { e.preventDefault(); addTag(fullTag); setTagSearch('') }}
-                                className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                                className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 text-left text-xs rounded-lg transition-colors"
+                                style={{ color: 'var(--text-secondary)' }}
+                                onMouseOver={e => e.currentTarget.style.background = 'var(--bg-surface)'}
+                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                               >
                                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: getTagColor(fullTag) }} />
-                                <span className="flex-1 text-gray-400">{child}</span>
-                                <span className="text-[10px] text-gray-600">{count}</span>
+                                <span className="flex-1">{child}</span>
+                                <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{count}</span>
                               </button>
                             )
                           }
                         }
-                        // Flat tag (no children) or parent's own direct count
                         if (!hasChildren && node.count > 0) {
                           items.push(
                             <button
                               key={parent}
                               onMouseDown={e => { e.preventDefault(); addTag(parent); setTagSearch('') }}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-lg transition-colors"
+                              style={{ color: 'var(--text-secondary)' }}
+                              onMouseOver={e => e.currentTarget.style.background = 'var(--bg-surface)'}
+                              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                             >
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(parent) }} />
-                              <span className="flex-1 text-gray-400">{parent}</span>
-                              <span className="text-[10px] text-gray-600">{node.count}</span>
+                              <span className="flex-1">{parent}</span>
+                              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{node.count}</span>
                             </button>
                           )
                         }
@@ -542,10 +611,15 @@ Rules:
                     {tagSearch && !allVaultTags.some(([t]) => t.toLowerCase() === tagSearch.toLowerCase()) && (
                       <button
                         onMouseDown={e => { e.preventDefault(); addTag(tagSearch.trim().toLowerCase()); setTagSearch('') }}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg text-indigo-400"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-lg transition-colors"
+                        style={{ color: 'var(--accent-hi)' }}
+                        onMouseOver={e => e.currentTarget.style.background = 'var(--bg-surface)'}
+                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                       >
                         + Create "{tagSearch.trim()}"
-                        {tagSearch.includes('/') && <span className="text-[10px] text-gray-600">(hierarchical)</span>}
+                        {tagSearch.includes('/') && (
+                          <span className="text-[10px] ml-1" style={{ color: 'var(--text-muted)' }}>hierarchical</span>
+                        )}
                       </button>
                     )}
                   </div>
@@ -553,42 +627,45 @@ Rules:
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+
+          {/* Meta info */}
+          <div className="ml-auto flex items-center gap-3 shrink-0">
             {wordCount > 0 && (
-              <span className="text-[10px] text-gray-600 hidden sm:inline">{wordCount}w</span>
+              <span className="text-[10px] hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+                {wordCount} words
+              </span>
             )}
-            {activeNote.frontmatter?.created && (
-              <span className="text-[10px] text-gray-600 shrink-0 hidden sm:inline">
-                {new Date(activeNote.frontmatter.updated || activeNote.frontmatter.created).toLocaleDateString()}
+            {activeNote.frontmatter?.updated && (
+              <span className="text-[10px] hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+                {new Date(activeNote.frontmatter.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Split confirmation modal */}
+      {/* ── Split confirm banner ─────────────────────────────────── */}
       {showSplitConfirm && (
-        <div className="border-b border-amber-500/30 bg-amber-500/5 px-4 py-3 animate-fadeIn">
+        <div className="px-5 py-3 shrink-0 animate-fadeIn" style={{ background: 'rgba(212,144,10,0.06)', borderBottom: '1px solid rgba(212,144,10,0.2)' }}>
           <div className="flex items-start gap-3">
-            <span className="text-lg">✂️</span>
             <div className="flex-1">
-              <p className="text-sm text-[var(--text-primary)] font-medium">Split into {detectSections.length} notes?</p>
-              <p className="text-xs text-[var(--text-secondary)] mt-1">
-                Each ## section becomes its own note, inheriting current tags and linking back to this note.
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Split into {detectSections.length} notes?</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                Each ## section becomes its own note, inheriting current tags and linking back here.
               </p>
-              <div className="mt-2 space-y-1">
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
                 {detectSections.map((s, i) => (
-                  <div key={i} className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
-                    <span className="w-1 h-1 rounded-full bg-[var(--accent)]" />
+                  <span key={i} className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                    <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent)' }} />
                     {s.heading}
-                  </div>
+                  </span>
                 ))}
               </div>
               <div className="flex gap-2 mt-3">
-                <button onClick={handleSplitNote} className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg hover:bg-amber-500 font-medium">
+                <button onClick={handleSplitNote} className="btn-primary text-xs" style={{ padding: '5px 14px' }}>
                   Split Note
                 </button>
-                <button onClick={() => setShowSplitConfirm(false)} className="text-xs text-gray-400 hover:text-gray-200 px-2">
+                <button onClick={() => setShowSplitConfirm(false)} className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   Cancel
                 </button>
               </div>
@@ -597,46 +674,47 @@ Rules:
         </div>
       )}
 
-      {/* Split result */}
+      {/* ── Split result banner ──────────────────────────────────── */}
       {splitResult && (
-        <div className="border-b border-green-500/30 bg-green-500/5 px-4 py-3 animate-fadeIn">
+        <div className="px-5 py-3 shrink-0 animate-fadeIn" style={{ background: 'rgba(74,222,128,0.05)', borderBottom: '1px solid rgba(74,222,128,0.15)' }}>
           <div className="flex items-start gap-3">
-            <span className="text-lg">✅</span>
             <div className="flex-1">
-              <p className="text-sm text-[var(--text-primary)] font-medium">Split complete</p>
-              <div className="mt-1 space-y-1">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Split complete</p>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
                 {splitResult.map((r, i) => (
-                  <div key={i} className="text-xs flex items-center gap-1.5">
+                  <span key={i} className="text-xs">
                     {r.status === 'created' ? (
-                      <button onClick={() => setActiveNote(r.filename)} className="text-[var(--accent)] hover:underline">{r.title}</button>
+                      <button onClick={() => setActiveNote(r.filename)} style={{ color: 'var(--accent-hi)' }} className="hover:underline">{r.title}</button>
                     ) : r.status === 'exists' ? (
-                      <span className="text-[var(--text-muted)]">{r.title} (already exists)</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{r.title} (exists)</span>
                     ) : (
-                      <span className="text-red-400">{r.title}: {r.error || 'unknown error'}</span>
+                      <span style={{ color: 'var(--red)' }}>{r.title}: error</span>
                     )}
-                  </div>
+                  </span>
                 ))}
               </div>
-              <button onClick={() => setSplitResult(null)} className="text-xs text-gray-400 hover:text-gray-200 mt-2">&times; Dismiss</button>
+              <button onClick={() => setSplitResult(null)} className="text-[11px] mt-2" style={{ color: 'var(--text-muted)' }}>Dismiss</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Editor / Preview — stacked on mobile, side-by-side on desktop */}
-      <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-        <div className={`${showPreview ? 'hidden sm:flex sm:w-1/2 sm:border-r sm:border-gray-800' : 'flex-1'} flex flex-col`}>
+      {/* ── Editor / Preview ────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden">
+        <div className={`${showPreview ? 'hidden sm:flex sm:w-1/2' : 'flex-1'} flex flex-col`}
+          style={showPreview ? { borderRight: '1px solid var(--border)' } : {}}>
           <textarea
             value={body}
             onChange={handleBodyChange}
-            className="editor-textarea flex-1 w-full bg-gray-950 text-gray-200 p-4 md:p-5 focus:outline-none text-sm leading-relaxed"
-            placeholder="Start writing in Markdown..."
+            className="editor-textarea flex-1 w-full focus:outline-none p-5"
+            style={{ background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+            placeholder="Start writing in Markdown…"
             spellCheck={false}
           />
         </div>
         {showPreview && (
-          <div className="flex-1 sm:w-1/2 overflow-y-auto p-4 md:p-6 bg-gray-950/50">
-            <div ref={previewRef} className="prose-vault max-w-none" dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+          <div className="flex-1 sm:w-1/2 overflow-y-auto p-5 md:p-7" style={{ background: 'var(--bg-panel)' }}>
+            <div ref={previewRef} className="prose-vault max-w-2xl" dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
           </div>
         )}
       </div>
