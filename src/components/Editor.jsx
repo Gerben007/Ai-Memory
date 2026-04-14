@@ -215,15 +215,19 @@ export default function Editor() {
       const res = await chatCompletion({
         model,
         max_tokens: 200,
-        system: `You are a tag generator for a knowledge vault that uses hierarchical tags.
+        system: `You are a tag generator for a personal knowledge vault. Tags must help the user FIND and CONNECT information later.
 
 Rules:
 - Return ONLY a comma-separated list of tags, nothing else
-- Use hierarchical format: parent/child (e.g., tech/database, business/finance, personal/health)
+- Use hierarchical format: parent/child (e.g., finance/tax, property/wonderboom, legal/compliance)
 - Use lowercase
+- NEVER use generic/useless tags like: reference, document, email, report, note, summary, overview, general, misc, info, data, content, source, import, file, attachment, text
+- Tags must be SPECIFIC and MEANINGFUL — ask "would someone search for this?"
+  Good: finance/vat, property/maintenance, legal/section-42, church/kerkraad
+  Bad: reference, document, important, research
+- A parent tag alone (e.g., "finance") is only ok if no better child exists
 - Prefer reusing existing vault tags when they fit: ${existingTags.slice(0, 50).join(', ')}
-- Generate 3-7 tags total
-- Mix of broad parent tags and specific parent/child tags
+- Generate 3-6 tags total
 - Do NOT include tags the note already has: ${currentTagList.join(', ')}`,
         messages: [{ role: 'user', content: `Title: ${title}\n\nContent:\n${body.slice(0, 2000)}` }]
       }, apiKey)

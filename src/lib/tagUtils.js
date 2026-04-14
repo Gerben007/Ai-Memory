@@ -146,24 +146,33 @@ export function normalizeTags(tags, vaultTagCounts) {
 }
 
 // Suggest tags for a note based on existing vault tags and note content
+// Tags that are too generic to be useful
+const BLOCKED_TAGS = new Set([
+  'reference', 'document', 'email', 'report', 'note', 'summary', 'overview',
+  'general', 'misc', 'info', 'data', 'content', 'source', 'import', 'file',
+  'attachment', 'text', 'other', 'draft', 'todo', 'important', 'review'
+])
+
+export function isGenericTag(tag) {
+  return BLOCKED_TAGS.has(tag.toLowerCase().trim())
+}
+
 export function suggestTags(noteBody, noteTitle, currentTags, allNotes) {
   const allTagCounts = getAllTagsWithCounts(allNotes)
   const currentSet = new Set(currentTags.map(t => t.toLowerCase().trim()))
   const suggestions = []
 
-  // Combine title + body for keyword matching
   const text = `${noteTitle} ${noteBody}`.toLowerCase()
 
   for (const [tag, count] of allTagCounts) {
     if (currentSet.has(tag.toLowerCase())) continue
-    // Check if the tag (or related words) appear in the note content
+    if (isGenericTag(tag)) continue // skip useless tags
     const tagLower = tag.toLowerCase()
     if (text.includes(tagLower)) {
       suggestions.push({ tag, count, reason: 'content match' })
     }
   }
 
-  // Sort by count descending (more used = more likely to be relevant)
   suggestions.sort((a, b) => b.count - a.count)
   return suggestions.slice(0, 8)
 }
@@ -227,6 +236,18 @@ export function analyzeTagHealth(notes) {
         tags: [tag, withSpace],
         message: `Format variants: "${tag}" & "${withSpace}"`,
         suggestion: tag.includes('-') ? tag : withSpace
+      })
+    }
+  }
+
+  // Flag generic/useless tags
+  for (const tag of tagList) {
+    if (isGenericTag(tag)) {
+      issues.push({
+        type: 'generic',
+        tags: [tag],
+        message: `Generic tag "${tag}" — not useful for finding notes`,
+        suggestion: ''  // should be deleted or made specific
       })
     }
   }

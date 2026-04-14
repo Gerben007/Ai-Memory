@@ -90,12 +90,18 @@ export function createImportRoutes(vaultDir) {
         const isFirst = i === 0
         const isOnly = chunks.length === 1
 
-        const systemPrompt = `You are a knowledge vault assistant. Convert the following document content into structured vault notes.
+        const systemPrompt = `You are a knowledge vault assistant. Convert document content into structured vault notes.
 
 Rules:
 - Return valid JSON array of note objects
 - Each note: { "title": "...", "tags": ["parent/child", ...], "content": "..." }
-- Use hierarchical tags (e.g., "business/finance", "tech/database")
+- Titles must be CONCISE (max 8 words) — the essence, not the full document name
+  Good: "SA VAT Rules for Farmers", "Dart SEO Strategy Q2"
+  Bad: "Document: Repliek — Sitplekke van Ampsdraers tydens...", "Email: Kerkraad Brief aan..."
+- Tags must be SPECIFIC and MEANINGFUL using hierarchical format (parent/child)
+  Good tags: finance/vat, property/maintenance, legal/section-42, church/kerkraad, dart/seo
+  NEVER use generic tags: reference, document, email, report, note, summary, overview, general, misc, source, import, attachment, data
+- Each note should have 2-5 specific tags
 - Content should be clean markdown
 - If the text covers multiple distinct topics, create separate notes for each
 - ${isOnly ? 'Create 1-5 notes depending on content breadth' : `This is chunk ${i + 1} of ${chunks.length} — create 1-3 notes for this section`}
