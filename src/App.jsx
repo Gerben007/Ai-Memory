@@ -20,17 +20,19 @@ export default function App() {
   const activeView = useStore(s => s.activeView)
   const setActiveView = useStore(s => s.setActiveView)
   const loadNotes = useStore(s => s.loadNotes)
+  const loadConfig = useStore(s => s.loadConfig)
   const rebuildIndex = useStore(s => s.rebuildIndex)
   const initialized = useStore(s => s.initialized)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     async function init() {
+      await loadConfig()
       await loadNotes()
       rebuildIndex()
     }
     init()
-  }, [loadNotes, rebuildIndex])
+  }, [loadNotes, loadConfig, rebuildIndex])
 
   const handleNavClick = (view) => {
     setActiveView(view)

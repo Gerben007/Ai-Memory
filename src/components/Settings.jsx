@@ -43,7 +43,7 @@ export default function Settings() {
           'x-api-key': keyInput
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model,
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Say "ok"' }]
         })
@@ -54,7 +54,8 @@ export default function Settings() {
         setApiKey(keyInput)
       } else {
         const err = await res.json().catch(() => ({}))
-        setKeyStatus(`Invalid: ${err.error || res.status}`)
+        const msg = typeof err.error === 'object' ? err.error.message : (err.error || res.status)
+        setKeyStatus(`Invalid: ${msg}`)
       }
     } catch (err) {
       setKeyStatus(`Error: ${err.message}`)

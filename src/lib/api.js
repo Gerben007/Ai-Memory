@@ -1,5 +1,19 @@
 const API_BASE = '/api'
 
+export async function loadConfig() {
+  const res = await fetch(`${API_BASE}/config`)
+  if (!res.ok) return {}
+  return res.json()
+}
+
+export async function saveConfig(updates) {
+  await fetch(`${API_BASE}/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates)
+  })
+}
+
 export async function fetchNotes() {
   const res = await fetch(`${API_BASE}/notes`)
   if (!res.ok) throw new Error('Failed to fetch notes')

@@ -244,16 +244,33 @@ export const useStore = create((set, get) => ({
   activeView: 'graph',
   setActiveView: (view) => set({ activeView: view }),
 
-  // Settings
+  // Settings — stored both in localStorage (fast) and server config (persists across Docker rebuilds)
   apiKey: localStorage.getItem(API_KEY_STORAGE_KEY) || '',
   setApiKey: (key) => {
     localStorage.setItem(API_KEY_STORAGE_KEY, key)
     set({ apiKey: key })
+    api.saveConfig({ apiKey: key }).catch(() => {})
   },
 
   model: localStorage.getItem(MODEL_STORAGE_KEY) || 'claude-sonnet-4-20250514',
-  setModel: (model) => {
-    localStorage.setItem(MODEL_STORAGE_KEY, model)
-    set({ model })
+  setModel: (m) => {
+    localStorage.setItem(MODEL_STORAGE_KEY, m)
+    set({ model: m })
+    api.saveConfig({ model: m }).catch(() => {})
+  },
+
+  // Load persisted config from server (called on app init)
+  loadConfig: async () => {
+    try {
+      const config = await api.loadConfig()
+      if (config.apiKey && !localStorage.getItem(API_KEY_STORAGE_KEY)) {
+        localStorage.setItem(API_KEY_STORAGE_KEY, config.apiKey)
+        set({ apiKey: config.apiKey })
+      }
+      if (config.model && !localStorage.getItem(MODEL_STORAGE_KEY)) {
+        localStorage.setItem(MODEL_STORAGE_KEY, config.model)
+        set({ model: config.model })
+      }
+    } catch {}
   }
 }))

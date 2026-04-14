@@ -12,6 +12,7 @@ const app = express()
 const PORT = process.env.PORT || 3001
 const HOST = process.env.HOST || '0.0.0.0'
 const VAULT_DIR = process.env.VAULT_DIR || path.join(__dirname, '..', 'vault')
+const CONFIG_PATH = path.join(VAULT_DIR, '.vault-config.json')
 
 // Ensure vault directory exists
 if (!fs.existsSync(VAULT_DIR)) {
@@ -21,6 +22,34 @@ if (!fs.existsSync(VAULT_DIR)) {
 app.use(cors())
 app.use(express.json())
 app.use(express.text())
+
+// Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
+app.get('/api/config', (req, res) => {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+      res.json(config)
+    } else {
+      res.json({})
+    }
+  } catch {
+    res.json({})
+  }
+})
+
+app.post('/api/config', (req, res) => {
+  try {
+    let existing = {}
+    if (fs.existsSync(CONFIG_PATH)) {
+      existing = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+    }
+    const updated = { ...existing, ...req.body }
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8')
+    res.json({ saved: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // API routes
 app.use('/api/notes', createFileRoutes(VAULT_DIR))
