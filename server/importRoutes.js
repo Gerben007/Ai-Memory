@@ -22,7 +22,11 @@ const MAX_CHUNK = 6000 // chars per AI chunk
 
 export function createImportRoutes(vaultDir) {
   const router = Router()
-  const upload = multer({ dest: '/tmp/vault-uploads', limits: { fileSize: 50 * 1024 * 1024 } })
+  const uploadDir = path.join(vaultDir, '.uploads')
+  const upload = multer({ dest: uploadDir, limits: { fileSize: 50 * 1024 * 1024 } })
+
+  // Ensure upload dir exists
+  fs.mkdir(uploadDir, { recursive: true }).catch(() => {})
 
   // POST /api/import — upload and extract text from a file
   router.post('/', upload.single('file'), async (req, res) => {

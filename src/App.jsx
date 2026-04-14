@@ -8,6 +8,7 @@ import GraphView from './components/GraphView'
 import AgentPanel from './components/AgentPanel'
 import ImportPanel from './components/ImportPanel'
 import Settings from './components/Settings'
+import SearchOverlay from './components/SearchOverlay'
 
 // SVG icon components
 const Icons = {
@@ -93,6 +94,19 @@ export default function App() {
   const rebuildIndex = useStore(s => s.rebuildIndex)
   const initialized = useStore(s => s.initialized)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+
+  // Ctrl+K / Cmd+K to open search
+  useEffect(() => {
+    const handleKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setShowSearch(s => !s)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -133,6 +147,20 @@ export default function App() {
             style={{ background: 'var(--accent-soft)', color: 'var(--accent-hi)', border: '1px solid rgba(212,144,10,0.25)' }}>
             KV
           </div>
+        </div>
+
+        {/* Search button */}
+        <div className="flex items-center justify-center py-2 px-1">
+          <button
+            onClick={() => setShowSearch(true)}
+            className="nav-icon"
+            data-label="Search (Ctrl+K)"
+            title="Search (Ctrl+K)"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </button>
         </div>
 
         {/* Nav icons */}
@@ -217,6 +245,9 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {/* ── Search overlay ──────────────────────────────────────── */}
+      {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
     </div>
   )
 }

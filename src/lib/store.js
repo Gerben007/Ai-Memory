@@ -150,13 +150,13 @@ export const useStore = create((set, get) => ({
     try {
       // Auto-normalize tags before saving (safe — only modifies tag values, not structure)
       try {
-        const { frontmatter, body } = parseFrontmatter(content)
-        if (frontmatter.tags && Array.isArray(frontmatter.tags) && frontmatter.tags.length > 0) {
+        const parsed = parseFrontmatter(content)
+        if (parsed.frontmatter.tags && Array.isArray(parsed.frontmatter.tags) && parsed.frontmatter.tags.length > 0) {
           const tagCounts = getAllTagsWithCounts(get().notes)
-          const normalized = normalizeTags(frontmatter.tags, tagCounts)
-          if (normalized.join(',') !== frontmatter.tags.join(',')) {
-            frontmatter.tags = normalized
-            content = matter.stringify(body, frontmatter)
+          const normalized = normalizeTags(parsed.frontmatter.tags, tagCounts)
+          if (normalized.join(',') !== parsed.frontmatter.tags.join(',')) {
+            parsed.frontmatter.tags = normalized
+            content = matter.stringify(parsed.body, parsed.frontmatter)
           }
         }
       } catch (e) {
@@ -165,6 +165,7 @@ export const useStore = create((set, get) => ({
       }
 
       await api.saveNote(filename, content)
+      const { frontmatter, body } = parseFrontmatter(content)
       set(state => ({
         notes: state.notes.map(n => n.filename === filename ? { ...n, content, body, frontmatter } : n)
       }))
