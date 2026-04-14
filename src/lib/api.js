@@ -32,7 +32,11 @@ export async function saveNote(filename, content) {
     headers: { 'Content-Type': 'text/plain' },
     body: content
   })
-  if (!res.ok) throw new Error('Failed to save note')
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`
+    try { const j = await res.json(); detail = j.error || detail } catch {}
+    throw new Error(`Failed to save "${filename}": ${detail}`)
+  }
   return res.json()
 }
 

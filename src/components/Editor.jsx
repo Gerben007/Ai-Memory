@@ -217,17 +217,15 @@ export default function Editor() {
 
       try {
         const now = new Date().toISOString()
-        // Use gray-matter to safely build frontmatter (handles special chars)
-        const fm = { title: sectionTitle, tags: baseTags, created: now, updated: now }
-        const sectionBody = `${section.body}\n\n---\n\n*Split from [[${parentTitle}]]*`
-        const sectionContent = matter.stringify(sectionBody, fm)
+        const tagStr = baseTags.length > 0 ? baseTags.map(t => t.includes(',') ? `"${t}"` : t).join(', ') : ''
+        const sectionContent = `---\ntitle: "${sectionTitle.replace(/"/g, '\\"')}"\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n---\n\n${section.body}\n\n---\n\n*Split from [[${parentTitle}]]*\n`
 
         // Use API directly to create new file (store.saveNote only updates existing)
         await apiSaveNote(filename, sectionContent)
         results.push({ title: sectionTitle, filename, status: 'created' })
       } catch (err) {
-        console.error('Split error:', err)
-        results.push({ title: sectionTitle, filename, status: 'error' })
+        console.error('Split error for', sectionTitle, ':', err)
+        results.push({ title: sectionTitle, filename, status: 'error', error: err.message })
       }
     }
 
@@ -442,7 +440,7 @@ export default function Editor() {
                     ) : r.status === 'exists' ? (
                       <span className="text-[var(--text-muted)]">{r.title} (already exists)</span>
                     ) : (
-                      <span className="text-red-400">{r.title} (error)</span>
+                      <span className="text-red-400">{r.title}: {r.error || 'unknown error'}</span>
                     )}
                   </div>
                 ))}
