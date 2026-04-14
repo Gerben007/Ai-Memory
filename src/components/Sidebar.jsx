@@ -234,7 +234,7 @@ export default function Sidebar({ onNavigate }) {
             return (
               <div
                 key={note.filename}
-                className={`note-card group ${isActive ? 'active' : ''}`}
+                className={`note-card group hover-glow ${isActive ? 'active' : ''}`}
                 onClick={() => handleNoteClick(note.filename)}
                 style={isActive ? { borderLeftWidth: 2, borderLeftColor: 'var(--accent)', paddingLeft: 12 } : {}}
               >

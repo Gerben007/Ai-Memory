@@ -120,7 +120,7 @@ body {
 }
 .btn-primary:hover {
   background: var(--accent-hi);
-  box-shadow: 0 0 18px var(--accent-glow);
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 40px rgba(59, 130, 246, 0.08);
 }
 
 .btn-secondary {
@@ -138,6 +138,7 @@ body {
   background: var(--bg-surface-hover);
   border-color: var(--border-hover);
   color: var(--text-primary);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.06);
 }
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
@@ -272,6 +273,7 @@ body {
   color: var(--text-secondary);
   background: var(--bg-surface);
   border-color: var(--border);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.1);
 }
 .nav-icon.active {
   color: var(--accent-hi);
@@ -351,6 +353,7 @@ body {
 }
 .note-card:hover {
   background: var(--bg-surface);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.06);
 }
 .note-card.active {
   background: var(--accent-soft);
