@@ -5,9 +5,10 @@ export default function WebClipper() {
   const loadNotes = useStore(s => s.loadNotes)
   const rebuildIndex = useStore(s => s.rebuildIndex)
   const [testResult, setTestResult] = useState(null)
+  const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002'
+  const [vaultUrl, setVaultUrl] = useState(defaultUrl)
 
-  // The bookmarklet code that users drag to their bookmark bar
-  const vaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002'
+  // The bookmarklet code — uses the configured vault URL
   const bookmarkletCode = `javascript:void(function(){var s=window.getSelection().toString().trim();var t=document.title;var u=window.location.href;if(!s){s=document.querySelector('article,main,.post-content,[role=main]');s=s?s.innerText.slice(0,5000):document.body.innerText.slice(0,2000)}fetch('${vaultUrl}/api/clip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t.slice(0,100),content:s.slice(0,5000),url:u,tags:['clip']})}).then(r=>r.json()).then(d=>{if(d.filename)alert('Clipped to Knowledge Vault: '+d.title);else alert('Clip failed: '+(d.error||'unknown'))}).catch(e=>alert('Clip failed: '+e.message))}())`
 
   const handleTest = async () => {
@@ -42,6 +43,19 @@ export default function WebClipper() {
       <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
         Drag the button below to your browser bookmark bar. Click it on any page to clip content to your vault.
       </p>
+
+      {/* Vault URL config */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-[11px] shrink-0" style={{ color: 'var(--text-muted)' }}>Vault URL:</span>
+        <input
+          type="text"
+          value={vaultUrl}
+          onChange={e => setVaultUrl(e.target.value)}
+          className="input-glass flex-1 text-xs"
+          style={{ padding: '5px 10px' }}
+          placeholder="http://192.168.20.62:3002"
+        />
+      </div>
 
       <div className="flex items-center gap-3 mb-3">
         <a
