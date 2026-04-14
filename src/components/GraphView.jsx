@@ -69,20 +69,20 @@ function buildGraphData(notes) {
     }
   }
 
-  // Tag edges — only meaningful connections (skip generic tags, require 2+ shared OR rare tag)
+  // Tag edges — connect notes sharing any meaningful tag (skip only generic tags)
   const tagUsage = new Map()
   notes.forEach(n => getTags(n).forEach(t => tagUsage.set(t, (tagUsage.get(t) || 0) + 1)))
   const tagEdgeSet = new Set()
+  // Tags used by 50%+ of notes are too broad for edges
+  const maxTagUsage = Math.max(notes.length * 0.5, 20)
   for (let i = 0; i < notes.length; i++) {
     const rawTagsA = getTags(notes[i])
-    // Filter out generic tags and overly broad tags (used by 30%+ of notes)
-    const tagsA = new Set(rawTagsA.filter(t => !isGenericTag(t) && (tagUsage.get(t) || 0) < notes.length * 0.3))
+    const tagsA = new Set(rawTagsA.filter(t => !isGenericTag(t) && (tagUsage.get(t) || 0) < maxTagUsage))
     if (tagsA.size === 0) continue
     for (let j = i + 1; j < notes.length; j++) {
-      const tagsB = getTags(notes[j]).filter(t => !isGenericTag(t) && (tagUsage.get(t) || 0) < notes.length * 0.3)
+      const tagsB = getTags(notes[j]).filter(t => !isGenericTag(t) && (tagUsage.get(t) || 0) < maxTagUsage)
       const shared = tagsB.filter(t => tagsA.has(t))
-      // Only connect if 2+ shared tags, OR 1 specific/rare tag (used by <8 notes)
-      if (shared.length >= 2 || (shared.length === 1 && (tagUsage.get(shared[0]) || 0) < 8)) {
+      if (shared.length > 0) {
         const key = [notes[i].filename, notes[j].filename].sort().join('::tag')
         if (!tagEdgeSet.has(key)) { tagEdgeSet.add(key); edges.push({ source: notes[i].filename, target: notes[j].filename, type: 'tag', weight: shared.length, sharedTags: shared }) }
       }
