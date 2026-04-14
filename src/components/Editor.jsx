@@ -6,6 +6,7 @@ import { getTagColor, getTags, getTagParts, suggestTags, getAllTagsWithCounts, b
 import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 import TagPill from './TagPill'
 import RelatedNotes from './RelatedNotes'
+import BacklinksPanel from './BacklinksPanel'
 
 export default function Editor() {
   const notes = useStore(s => s.notes)
@@ -468,8 +469,7 @@ Rules:
                   &times;
                 </button>
               </div>
-            ) : (
-              {/* Close note → back to graph */}
+            ) : (<>
               <button
                 onClick={() => { setActiveNote(null); setActiveView('graph') }}
                 className="flex items-center justify-center rounded-lg transition-all"
@@ -480,7 +480,6 @@ Rules:
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
-
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="flex items-center justify-center rounded-lg transition-all"
@@ -494,7 +493,7 @@ Rules:
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                 </svg>
               </button>
-            )}
+            </>)}
           </div>
         </div>
 
@@ -760,8 +759,9 @@ Rules:
             )}
           </div>
 
-          {/* Related Notes — bottom of editor */}
+          {/* Backlinks + Related Notes — bottom of editor */}
           <div className="shrink-0 hidden sm:block" style={{ background: 'var(--bg-panel)' }}>
+            <BacklinksPanel noteFilename={activeNoteFilename} />
             <RelatedNotes noteFilename={activeNoteFilename} />
           </div>
         </div>

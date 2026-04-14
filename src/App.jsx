@@ -9,6 +9,9 @@ import AgentPanel from './components/AgentPanel'
 import ImportPanel from './components/ImportPanel'
 import Settings from './components/Settings'
 import SearchOverlay from './components/SearchOverlay'
+import TimelineView from './components/TimelineView'
+import KnowledgePulse from './components/KnowledgePulse'
+import InsightGenerator from './components/InsightGenerator'
 
 // SVG icon components
 const Icons = {
@@ -67,11 +70,33 @@ const Icons = {
   )
 }
 
+const Icons2 = {
+  timeline: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  pulse: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  ),
+  insight: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18h6"/><path d="M10 22h4"/>
+      <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+    </svg>
+  )
+}
+
 const NAV_ITEMS = [
   { key: 'editor',    label: 'Notes',     icon: Icons.notes },
   { key: 'chat',      label: 'AI Chat',   icon: Icons.chat },
   { key: 'brainstorm',label: 'Brainstorm',icon: Icons.brainstorm },
   { key: 'graph',     label: 'Graph',     icon: Icons.graph },
+  { key: 'timeline',  label: 'Timeline',  icon: Icons2.timeline },
+  { key: 'pulse',     label: 'Pulse',     icon: Icons2.pulse },
+  { key: 'insights',  label: 'Insights',  icon: Icons2.insight },
   { key: 'import',    label: 'Import',    icon: Icons.import },
   { key: 'agent',     label: 'Agent API', icon: Icons.agent },
   { key: 'settings',  label: 'Settings',  icon: Icons.settings },
@@ -219,6 +244,9 @@ export default function App() {
           {activeView === 'chat'       && <ChatPanel />}
           {activeView === 'brainstorm' && <BrainstormPanel />}
           {activeView === 'graph'      && <GraphView />}
+          {activeView === 'timeline'   && <TimelineView />}
+          {activeView === 'pulse'      && <KnowledgePulse />}
+          {activeView === 'insights'   && <InsightGenerator />}
           {activeView === 'agent'      && <AgentPanel />}
           {activeView === 'import'     && <ImportPanel />}
           {activeView === 'settings'   && <Settings />}
