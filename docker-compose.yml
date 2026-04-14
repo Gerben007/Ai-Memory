@@ -5,7 +5,7 @@ services:
     container_name: knowledge-vault
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3002:3001"
     volumes:
       - vault-data:/data/vault
     environment:
