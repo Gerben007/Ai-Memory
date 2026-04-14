@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
-import { getTagColor, getTags, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
+import { getTagColor, getTags, getTagParts, suggestTags, getAllTagsWithCounts, buildTagTree } from '../lib/tagUtils'
 import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 import TagPill from './TagPill'
 import matter from 'gray-matter'
@@ -197,21 +197,22 @@ export default function Editor() {
       const res = await chatCompletion({
         model,
         max_tokens: 200,
-        system: `You are a tag generator for a knowledge vault. Given a note's content, generate relevant tags.
+        system: `You are a tag generator for a knowledge vault that uses hierarchical tags.
 
 Rules:
 - Return ONLY a comma-separated list of tags, nothing else
-- Use lowercase, single words or hyphenated phrases
+- Use hierarchical format: parent/child (e.g., tech/database, business/finance, personal/health)
+- Use lowercase
 - Prefer reusing existing vault tags when they fit: ${existingTags.slice(0, 50).join(', ')}
 - Generate 3-7 tags total
-- Tags should categorize the topic, domain, and key concepts
+- Mix of broad parent tags and specific parent/child tags
 - Do NOT include tags the note already has: ${currentTagList.join(', ')}`,
         messages: [{ role: 'user', content: `Title: ${title}\n\nContent:\n${body.slice(0, 2000)}` }]
       }, apiKey)
 
       const data = await res.json()
       const aiText = data.content?.[0]?.text || ''
-      const aiTags = aiText.split(',').map(t => t.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')).filter(Boolean)
+      const aiTags = aiText.split(',').map(t => t.trim().toLowerCase().replace(/[^a-z0-9-/]/g, '').replace(/\/+/g, '/').replace(/^\/|\/$/g, '')).filter(Boolean)
 
       if (aiTags.length > 0) {
         const combined = [...currentTagList, ...aiTags.filter(t => !currentTagList.some(c => c.toLowerCase() === t))]
@@ -353,6 +354,14 @@ Rules:
             {dirty && !saveStatus && (
               <span className="text-[10px] md:text-xs text-amber-400 hidden sm:inline">Unsaved</span>
             )}
+            <button
+              onClick={handleAutoTag}
+              disabled={autoTagging || !body.trim()}
+              className="text-[11px] md:text-xs px-2 md:px-3 py-1.5 rounded-lg border border-indigo-700/50 text-indigo-400 hover:text-indigo-300 hover:border-indigo-500/50 disabled:opacity-30 hidden sm:inline-flex items-center gap-1"
+              title="Auto-generate tags from content"
+            >
+              {autoTagging ? '...' : '✨ Auto-tag'}
+            </button>
             {canSplit && (
               <button
                 onClick={() => setShowSplitConfirm(true)}
@@ -429,15 +438,6 @@ Rules:
             >
               + tag
             </button>
-            {/* Auto-generate tags */}
-            <button
-              onClick={handleAutoTag}
-              disabled={autoTagging || !body.trim()}
-              className="text-[10px] px-1.5 py-0.5 rounded-full border border-dashed border-indigo-700/50 text-indigo-400/70 hover:text-indigo-300 hover:border-indigo-500/50 disabled:opacity-30 shrink-0"
-              title="Auto-generate tags from content"
-            >
-              {autoTagging ? '...' : '✨ auto'}
-            </button>
 
             {/* Tag picker dropdown */}
             {showTagSuggestions && (
@@ -467,43 +467,85 @@ Rules:
                   {tagSuggestions.length > 0 && (
                     <div className="px-1 pt-1">
                       <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">Suggested</div>
-                      {tagSuggestions.filter(s => !tagSearch || s.tag.toLowerCase().includes(tagSearch.toLowerCase())).map(s => (
-                        <button
-                          key={s.tag}
-                          onMouseDown={e => { e.preventDefault(); addTag(s.tag); setTagSearch('') }}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
-                        >
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(s.tag) }} />
-                          <span className="flex-1 text-gray-300">{s.tag}</span>
-                          <span className="text-[10px] text-gray-600">{s.count}</span>
-                        </button>
-                      ))}
+                      {tagSuggestions.filter(s => !tagSearch || s.tag.toLowerCase().includes(tagSearch.toLowerCase())).map(s => {
+                        const parts = getTagParts(s.tag)
+                        return (
+                          <button
+                            key={s.tag}
+                            onMouseDown={e => { e.preventDefault(); addTag(s.tag); setTagSearch('') }}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(s.tag) }} />
+                            <span className="flex-1 text-gray-300">
+                              {parts.isHierarchical ? <><span className="text-gray-600">{parts.parent}/</span>{parts.child}</> : s.tag}
+                            </span>
+                            <span className="text-[10px] text-gray-600">{s.count}</span>
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
 
-                  {/* All vault tags */}
+                  {/* All vault tags — grouped by parent */}
                   <div className="px-1 py-1">
                     {tagSuggestions.length > 0 && <div className="text-[9px] uppercase tracking-wider text-gray-600 px-2 py-1">All tags</div>}
-                    {allVaultTags
-                      .filter(([tag]) => !tagSearch || tag.toLowerCase().includes(tagSearch.toLowerCase()))
-                      .slice(0, 15)
-                      .map(([tag, count]) => (
-                        <button
-                          key={tag}
-                          onMouseDown={e => { e.preventDefault(); addTag(tag); setTagSearch('') }}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
-                        >
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(tag) }} />
-                          <span className="flex-1 text-gray-400">{tag}</span>
-                          <span className="text-[10px] text-gray-600">{count}</span>
-                        </button>
-                      ))}
+                    {(() => {
+                      const filtered = allVaultTags.filter(([tag]) => !tagSearch || tag.toLowerCase().includes(tagSearch.toLowerCase()))
+                      const tree = buildTagTree(new Map(filtered))
+                      const items = []
+                      for (const [parent, node] of tree) {
+                        const hasChildren = node.children.size > 0
+                        // Show parent as group header if it has children
+                        if (hasChildren) {
+                          items.push(
+                            <div key={`hdr-${parent}`} className="text-[9px] uppercase tracking-wider text-gray-600 px-2 pt-2 pb-0.5 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getTagColor(parent) }} />
+                              {parent}
+                              <button
+                                onMouseDown={e => { e.preventDefault(); addTag(parent); setTagSearch('') }}
+                                className="text-gray-700 hover:text-gray-400 ml-auto"
+                              >+</button>
+                            </div>
+                          )
+                          for (const [child, count] of node.children) {
+                            const fullTag = `${parent}/${child}`
+                            items.push(
+                              <button
+                                key={fullTag}
+                                onMouseDown={e => { e.preventDefault(); addTag(fullTag); setTagSearch('') }}
+                                className="w-full flex items-center gap-2 pl-5 pr-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: getTagColor(fullTag) }} />
+                                <span className="flex-1 text-gray-400">{child}</span>
+                                <span className="text-[10px] text-gray-600">{count}</span>
+                              </button>
+                            )
+                          }
+                        }
+                        // Flat tag (no children) or parent's own direct count
+                        if (!hasChildren && node.count > 0) {
+                          items.push(
+                            <button
+                              key={parent}
+                              onMouseDown={e => { e.preventDefault(); addTag(parent); setTagSearch('') }}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg"
+                            >
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getTagColor(parent) }} />
+                              <span className="flex-1 text-gray-400">{parent}</span>
+                              <span className="text-[10px] text-gray-600">{node.count}</span>
+                            </button>
+                          )
+                        }
+                      }
+                      return items.slice(0, 20)
+                    })()}
                     {tagSearch && !allVaultTags.some(([t]) => t.toLowerCase() === tagSearch.toLowerCase()) && (
                       <button
                         onMouseDown={e => { e.preventDefault(); addTag(tagSearch.trim().toLowerCase()); setTagSearch('') }}
                         className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-800 rounded-lg text-indigo-400"
                       >
                         + Create "{tagSearch.trim()}"
+                        {tagSearch.includes('/') && <span className="text-[10px] text-gray-600">(hierarchical)</span>}
                       </button>
                     )}
                   </div>

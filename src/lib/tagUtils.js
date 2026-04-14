@@ -13,7 +13,55 @@ function hashCode(str) {
 
 export function getTagColor(tag) {
   if (!tag) return '#64748b'
-  return TAG_PALETTE[hashCode(tag) % TAG_PALETTE.length]
+  // Color by root parent so hierarchy shares colors (tech/db and tech/api = same color)
+  const root = getTagRoot(tag)
+  return TAG_PALETTE[hashCode(root) % TAG_PALETTE.length]
+}
+
+// ── Tag hierarchy helpers (separator: /) ────────────────────────────────
+
+// Get root parent: "tech/database" → "tech"
+export function getTagRoot(tag) {
+  const i = tag.indexOf('/')
+  return i > 0 ? tag.slice(0, i) : tag
+}
+
+// Get display parts: "tech/database" → { parent: "tech", child: "database" }
+export function getTagParts(tag) {
+  const i = tag.indexOf('/')
+  if (i > 0) return { parent: tag.slice(0, i), child: tag.slice(i + 1), isHierarchical: true }
+  return { parent: null, child: tag, isHierarchical: false }
+}
+
+// Check if a note's tag matches a target tag or is a child of it
+// "tech" matches "tech", "tech/database", "tech/api"
+// "tech/database" only matches "tech/database"
+export function tagMatchesOrIsChild(noteTag, targetTag) {
+  if (noteTag === targetTag) return true
+  if (noteTag.startsWith(targetTag + '/')) return true
+  return false
+}
+
+// Build a tree structure from flat tag list
+// Returns: Map<parentOrTag, { count, children: Map<childName, count> }>
+export function buildTagTree(tagCounts) {
+  const tree = new Map()
+
+  for (const [tag, count] of tagCounts) {
+    const { parent, child, isHierarchical } = getTagParts(tag)
+
+    if (isHierarchical) {
+      if (!tree.has(parent)) tree.set(parent, { count: 0, children: new Map() })
+      const node = tree.get(parent)
+      node.children.set(child, (node.children.get(child) || 0) + count)
+      node.count += count
+    } else {
+      if (!tree.has(tag)) tree.set(tag, { count: 0, children: new Map() })
+      tree.get(tag).count += count
+    }
+  }
+
+  return tree
 }
 
 // Extract tags from a note — tries frontmatter first, falls back to raw YAML parsing
