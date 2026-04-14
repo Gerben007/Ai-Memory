@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { useAutoSave } from '../hooks/useAutoSave'
-import { getTagColor, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
+import { getTagColor, getTags, suggestTags, getAllTagsWithCounts } from '../lib/tagUtils'
 import { saveNote as apiSaveNote } from '../lib/api'
 import matter from 'gray-matter'
 
@@ -34,7 +34,7 @@ export default function Editor() {
     if (activeNote) {
       setBody(activeNote.body || '')
       setTitle(activeNote.frontmatter?.title || activeNote.filename.replace(/\.md$/, ''))
-      setTags((activeNote.frontmatter?.tags || []).join(', '))
+      setTags(getTags(activeNote).join(', '))
       setDirty(false)
       setSaveStatus('')
       setShowSplitConfirm(false)
