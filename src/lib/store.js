@@ -147,32 +147,12 @@ export const useStore = create((set, get) => ({
   setActiveNote: (filename) => set({ activeNoteFilename: filename, activeView: 'editor' }),
 
   saveNote: async (filename, content) => {
-    try {
-      // Auto-normalize tags before saving (safe — only modifies tag values, not structure)
-      try {
-        const parsed = parseFrontmatter(content)
-        if (parsed.frontmatter.tags && Array.isArray(parsed.frontmatter.tags) && parsed.frontmatter.tags.length > 0) {
-          const tagCounts = getAllTagsWithCounts(get().notes)
-          const normalized = normalizeTags(parsed.frontmatter.tags, tagCounts)
-          if (normalized.join(',') !== parsed.frontmatter.tags.join(',')) {
-            parsed.frontmatter.tags = normalized
-            content = matter.stringify(parsed.body, parsed.frontmatter)
-          }
-        }
-      } catch (e) {
-        // If normalize fails, save original content unchanged
-        console.warn('Tag normalize skipped:', e.message)
-      }
-
-      await api.saveNote(filename, content)
-      const { frontmatter, body } = parseFrontmatter(content)
-      set(state => ({
-        notes: state.notes.map(n => n.filename === filename ? { ...n, content, body, frontmatter } : n)
-      }))
-      get().rebuildIndex()
-    } catch (err) {
-      console.error('Failed to save note:', err)
-    }
+    await api.saveNote(filename, content)
+    const { frontmatter, body } = parseFrontmatter(content)
+    set(state => ({
+      notes: state.notes.map(n => n.filename === filename ? { ...n, content, body, frontmatter } : n)
+    }))
+    get().rebuildIndex()
   },
 
   createNote: async (title) => {

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useStore } from '../lib/store'
-import { getTagColor, getTags, getTagParts, tagMatchesOrIsChild } from '../lib/tagUtils'
+import { getTagColor, getTags, getTitle, getBody, getTagParts, tagMatchesOrIsChild } from '../lib/tagUtils'
 
 export default function TagNotesPopup({ tag, onClose }) {
   const notes = useStore(s => s.notes)
@@ -20,8 +20,8 @@ export default function TagNotesPopup({ tag, onClose }) {
         if (t !== tag && tagMatchesOrIsChild(t, tag)) children.add(t)
       }
 
-      const title = n.frontmatter?.title || n.filename.replace(/\.md$/, '').replace(/-/g, ' ')
-      const preview = (n.body || '').replace(/^#.*\n/gm, '').trim().slice(0, 120)
+      const title = getTitle(n)
+      const preview = getBody(n).replace(/^#.*\n/gm, '').replace(/[*_`~]/g, '').trim().slice(0, 120)
       const date = n.frontmatter?.updated || n.frontmatter?.created
       // Show which specific tag matched
       const matchedTag = noteTags.find(t => tagMatchesOrIsChild(t, tag))

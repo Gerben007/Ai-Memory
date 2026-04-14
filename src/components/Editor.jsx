@@ -47,47 +47,61 @@ export default function Editor() {
     }
   }, [activeNoteFilename]) // intentionally only depend on filename
 
-  // Build full content from parts
+  // Build full content from parts — manual frontmatter to avoid matter.stringify failures
   const buildContent = useCallback((bodyText, titleText, tagsText) => {
     const fm = activeNote?.frontmatter || {}
     const tagList = tagsText.split(',').map(t => t.trim()).filter(Boolean)
     const now = new Date().toISOString()
+    const created = fm.created || now
 
-    const frontmatter = {
-      title: titleText,
-      tags: tagList,
-      created: fm.created || now,
-      updated: now
-    }
+    // Preserve extra frontmatter keys
+    const extra = Object.entries(fm)
+      .filter(([k]) => !['title', 'tags', 'created', 'updated'].includes(k))
+      .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+      .join('\n')
 
-    // Preserve extra frontmatter fields
-    for (const [key, val] of Object.entries(fm)) {
-      if (!frontmatter.hasOwnProperty(key)) {
-        frontmatter[key] = val
-      }
-    }
+    const tagStr = tagList.map(t => t.includes(',') ? `"${t}"` : t).join(', ')
+    const frontmatter = [
+      '---',
+      `title: "${titleText.replace(/"/g, '\\"')}"`,
+      `tags: [${tagStr}]`,
+      `created: ${created}`,
+      `updated: ${now}`,
+      extra,
+      '---'
+    ].filter(Boolean).join('\n')
 
-    return matter.stringify(bodyText, frontmatter)
+    return `${frontmatter}\n\n${bodyText}\n`
   }, [activeNote])
 
   // Manual save
   const handleManualSave = useCallback(async () => {
     if (!activeNoteFilename) return
-    const content = buildContent(body, title, tags)
-    await saveNote(activeNoteFilename, content)
-    setSaveStatus('Saved')
-    setDirty(false)
-    setTimeout(() => setSaveStatus(''), 2000)
+    try {
+      const content = buildContent(body, title, tags)
+      await saveNote(activeNoteFilename, content)
+      setSaveStatus('Saved!')
+      setDirty(false)
+      setTimeout(() => setSaveStatus(''), 3000)
+    } catch (err) {
+      console.error('Save failed:', err)
+      setSaveStatus('Save failed')
+      setTimeout(() => setSaveStatus(''), 4000)
+    }
   }, [activeNoteFilename, body, title, tags, buildContent, saveNote])
 
   // Auto-save
   const doSave = useCallback(async (bodyText, titleText, tagsText) => {
     if (!activeNoteFilename) return
-    const content = buildContent(bodyText, titleText, tagsText)
-    await saveNote(activeNoteFilename, content)
-    setSaveStatus('Saved')
-    setDirty(false)
-    setTimeout(() => setSaveStatus(''), 2000)
+    try {
+      const content = buildContent(bodyText, titleText, tagsText)
+      await saveNote(activeNoteFilename, content)
+      setSaveStatus('Saved!')
+      setDirty(false)
+      setTimeout(() => setSaveStatus(''), 3000)
+    } catch (err) {
+      console.error('Auto-save failed:', err)
+    }
   }, [activeNoteFilename, buildContent, saveNote])
 
   const { triggerSave } = useAutoSave(doSave)
@@ -366,10 +380,19 @@ Rules:
           {/* Status */}
           <div className="flex items-center gap-2 shrink-0">
             {saveStatus && (
-              <span className="text-[11px] font-medium" style={{ color: 'var(--green)' }}>{saveStatus}</span>
+              <span
+                className="text-[11px] font-medium px-2.5 py-1 rounded-md animate-fadeIn"
+                style={{
+                  color: saveStatus.includes('fail') ? 'var(--red)' : 'var(--green)',
+                  background: saveStatus.includes('fail') ? 'rgba(248,113,113,0.1)' : 'rgba(74,222,128,0.1)',
+                  border: `1px solid ${saveStatus.includes('fail') ? 'rgba(248,113,113,0.2)' : 'rgba(74,222,128,0.2)'}`
+                }}
+              >
+                {saveStatus}
+              </span>
             )}
             {dirty && !saveStatus && (
-              <span className="text-[11px] hidden sm:inline" style={{ color: 'var(--amber)' }}>Unsaved</span>
+              <span className="text-[11px] hidden sm:inline px-2 py-0.5 rounded-md" style={{ color: 'var(--amber)', background: 'rgba(251,191,36,0.08)' }}>Unsaved</span>
             )}
 
             {/* Auto-tag */}

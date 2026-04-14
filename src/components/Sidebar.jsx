@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore, TEMPLATES } from '../lib/store'
-import { getTags, getAllTagsWithCounts } from '../lib/tagUtils'
+import { getTags, getTitle, getBody, getAllTagsWithCounts } from '../lib/tagUtils'
 import TagCleanup from './TagCleanup'
 import TagPill from './TagPill'
 
@@ -67,12 +67,13 @@ export default function Sidebar({ onNavigate }) {
 
   // Get preview text from note body
   const getPreview = (note) => {
-    if (!note.body) return ''
-    return note.body
-      .replace(/^#+\s+.+$/gm, '')          // remove headings
-      .replace(/!\[.*?\]\(.*?\)/g, '')      // remove images
-      .replace(/\[.*?\]\(.*?\)/g, '$1')     // flatten links
-      .replace(/[*_`~]/g, '')              // remove markdown syntax
+    const body = getBody(note)
+    if (!body) return ''
+    return body
+      .replace(/^#+\s+.+$/gm, '')
+      .replace(/!\[.*?\]\(.*?\)/g, '')
+      .replace(/\[.*?\]\(.*?\)/g, '$1')
+      .replace(/[*_`~]/g, '')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 80)
@@ -239,7 +240,7 @@ export default function Sidebar({ onNavigate }) {
               >
                 <div className="flex items-start justify-between gap-1">
                   <div className="note-card-title flex-1">
-                    {note.frontmatter?.title || note.filename.replace(/\.md$/, '')}
+                    {getTitle(note)}
                   </div>
                   {displayDate && (
                     <span className="text-[10px] shrink-0 mt-0.5" style={{ color: 'var(--text-muted)' }}>

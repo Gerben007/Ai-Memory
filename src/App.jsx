@@ -144,7 +144,7 @@ export default function App() {
         {/* Logo mark */}
         <div className="flex items-center justify-center h-12 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
           <div className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold"
-            style={{ background: 'var(--accent-soft)', color: 'var(--accent-hi)', border: '1px solid rgba(212,144,10,0.25)' }}>
+            style={{ background: 'var(--accent-soft)', color: 'var(--accent-hi)', border: '1px solid rgba(59,130,246,0.25)' }}>
             KV
           </div>
         </div>

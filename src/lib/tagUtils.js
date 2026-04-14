@@ -76,6 +76,24 @@ export function getTags(note) {
   return []
 }
 
+// Get note title with regex fallback (gray-matter often fails to parse)
+export function getTitle(note) {
+  if (note.frontmatter?.title) return note.frontmatter.title
+  const raw = note.content || ''
+  const m = raw.match(/^title:\s*"?([^"\n]+)"?\s*$/m)
+  if (m) return m[1].trim()
+  return note.filename?.replace(/\.md$/, '').replace(/-/g, ' ') || 'Untitled'
+}
+
+// Get clean body text (strips frontmatter if gray-matter didn't parse it)
+export function getBody(note) {
+  if (note.body != null && !note.body.startsWith('---')) return note.body
+  const raw = note.content || note.body || ''
+  // Strip frontmatter block
+  const stripped = raw.replace(/^---[\s\S]*?---\s*/, '')
+  return stripped
+}
+
 // Collect all tags across the vault with usage counts
 export function getAllTagsWithCounts(notes) {
   const counts = new Map()
