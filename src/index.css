@@ -5,22 +5,22 @@
 
 :root {
   /* Backgrounds */
-  --bg-base:       #09090d;
-  --bg-nav:        #0c0c11;
-  --bg-panel:      #0f0f16;
-  --bg-surface:    rgba(255, 255, 255, 0.035);
-  --bg-surface-hover: rgba(255, 255, 255, 0.065);
-  --bg-glass:      rgba(255, 255, 255, 0.025);
+  --bg-base:       #13131a;
+  --bg-nav:        #17171f;
+  --bg-panel:      #1c1c26;
+  --bg-surface:    rgba(255, 255, 255, 0.055);
+  --bg-surface-hover: rgba(255, 255, 255, 0.09);
+  --bg-glass:      rgba(255, 255, 255, 0.04);
 
   /* Borders */
-  --border:        rgba(255, 255, 255, 0.07);
-  --border-hover:  rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.11);
+  --border:        rgba(255, 255, 255, 0.10);
+  --border-hover:  rgba(255, 255, 255, 0.20);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   /* Text */
-  --text-primary:   #e0e4ed;
-  --text-secondary: #7b839a;
-  --text-muted:     #3e4358;
+  --text-primary:   #eaecf4;
+  --text-secondary: #9299b0;
+  --text-muted:     #565d78;
 
   /* Accent — electric blue */
   --accent:       #3b82f6;
