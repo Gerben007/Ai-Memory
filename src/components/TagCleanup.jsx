@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { useStore } from '../lib/store'
 import { getTagColor, getTags, getBody, analyzeTagHealth } from '../lib/tagUtils'
-import { saveNote as apiSaveNote } from '../lib/api'
+import { saveNote as apiSaveNote, chatCompletion } from '../lib/api'
 
 // Build note content without matter.stringify (which can crash)
 function buildNoteContent(note, newTags) {
@@ -22,12 +22,16 @@ export default function TagCleanup({ onClose }) {
   const notes = useStore(s => s.notes)
   const loadNotes = useStore(s => s.loadNotes)
   const rebuildIndex = useStore(s => s.rebuildIndex)
+  const apiKey = useStore(s => s.apiKey)
+  const model = useStore(s => s.model)
 
   const [renaming, setRenaming] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState(null)
   const [filter, setFilter] = useState('all')
   const [selectedTag, setSelectedTag] = useState(null)
+  const [bulkReview, setBulkReview] = useState(null)  // { mappings: {oldTag: newTag|null}, reasoning }
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const health = useMemo(() => analyzeTagHealth(notes), [notes])
   const { tagCounts, issues, orphans } = health
@@ -83,19 +87,96 @@ export default function TagCleanup({ onClose }) {
     setResult(`Removed "${tag}" from ${count} note${count !== 1 ? 's' : ''}`)
   }, [notes, loadNotes, rebuildIndex])
 
-  // Remove all orphan tags (tags used by only 1 note)
-  const removeAllOrphans = useCallback(async () => {
-    if (orphans.length === 0) return
-    setProcessing(true)
+  // AI bulk tag review — sends entire tag list to Claude, gets back mappings
+  const runBulkReview = useCallback(async () => {
+    if (!apiKey) {
+      setResult({ error: 'Set your Claude API key in Settings first' })
+      return
+    }
+    setBulkLoading(true)
     setResult(null)
 
+    const tagList = [...tagCounts.entries()].map(([t, c]) => `${t} (${c})`).join(', ')
+
+    try {
+      const res = await chatCompletion({
+        model,
+        max_tokens: 4000,
+        system: `You are a knowledge taxonomy architect. Design a SYSTEMATIC, SOPHISTICATED tagging schema for this personal knowledge vault, then produce a consolidation plan that enforces it across all existing tags.
+
+## Your job
+Don't just merge duplicates — build a COHERENT TAXONOMY. Every tag must fit a deliberate system. The end result should feel like an engineered classification scheme, not an ad-hoc collection.
+
+## Taxonomy principles
+1. **Parent/child hierarchy** — prefer \`parent/child\` form for grouped concepts. Examples:
+   - \`church/meintjieskop\`, \`church/brukaros\`, \`church/council\`
+   - \`project/ai-memory\`, \`project/vault\`
+   - \`person/john-doe\`, \`place/windhoek\`
+2. **Consistent top-level categories** — pick a small set of parent categories (e.g., project, person, place, topic, church, event, tool) and fit most tags under them. Flat standalone tags are allowed only for broad themes (e.g., \`theology\`, \`strategy\`).
+3. **Naming convention** — lowercase, hyphens for multi-word, no spaces, no special characters, no trailing punctuation. Singular over plural where ambiguous.
+4. **Language** — translate non-English common nouns/concepts to English. Keep proper nouns (place names, personal names, institution names) in their original form.
+5. **Resolve inconsistencies**:
+   - case variants → single lowercase form
+   - singular/plural duplicates → singular
+   - synonyms → single canonical term
+   - near-duplicates (typos, spacing) → canonical form
+6. **Preserve specificity** — keep specific tags even if used once, but fit them into the hierarchy (e.g., a rare \`gk-meintjieskop\` becomes \`church/meintjieskop\`).
+7. **Drop only truly generic noise** — tags like \`reference\`, \`document\`, \`note\`, \`email\` that apply to everything. If unsure, keep it.
+
+## Output format
+Return ONLY a JSON object, no prose outside it:
+{
+  "methodology": "2-3 sentence description of the taxonomy system you designed (parent categories used, naming rules, etc.)",
+  "mappings": {
+    "old-tag": "new-tag",
+    "tag-to-delete": null
+  },
+  "reasoning": "Brief bullet summary of the main consolidation moves"
+}
+
+Rules for mappings:
+- Only include tags that should CHANGE or be DELETED. Unchanged tags must NOT appear.
+- Use \`null\` as the value to DELETE a tag entirely (only for true noise).
+- Every mapping must follow the taxonomy you designed in "methodology" — be consistent.`,
+        messages: [{
+          role: 'user',
+          content: `Review these tags (name followed by count in parens):\n\n${tagList}\n\nReturn the JSON consolidation plan.`
+        }]
+      }, apiKey)
+
+      const data = await res.json()
+      const text = data.content?.[0]?.text || ''
+
+      // Extract JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('AI did not return valid JSON')
+      const parsed = JSON.parse(jsonMatch[0])
+
+      setBulkReview(parsed)
+    } catch (err) {
+      setResult({ error: `Bulk review failed: ${err.message}` })
+    } finally {
+      setBulkLoading(false)
+    }
+  }, [apiKey, model, tagCounts])
+
+  // Apply the bulk review mappings (null value = delete tag)
+  const applyBulkReview = useCallback(async () => {
+    if (!bulkReview?.mappings) return
+    setProcessing(true)
+
+    const mappings = bulkReview.mappings
     let totalChanges = 0
+
     for (const note of notes) {
       const noteTags = getTags(note)
-      const cleaned = noteTags.filter(t => !orphans.includes(t))
-      if (cleaned.length === noteTags.length) continue
+      const newTags = noteTags
+        .map(t => (t in mappings ? mappings[t] : t))
+        .filter(t => t != null && t !== '')
+      const deduped = [...new Set(newTags)]
+      if (deduped.length === noteTags.length && deduped.every((t, i) => t === noteTags[i])) continue
 
-      const content = buildNoteContent(note, cleaned)
+      const content = buildNoteContent(note, deduped)
       await apiSaveNote(note.filename, content)
       totalChanges++
     }
@@ -103,8 +184,9 @@ export default function TagCleanup({ onClose }) {
     await loadNotes()
     rebuildIndex()
     setProcessing(false)
-    setResult(`Removed ${orphans.length} orphan tag${orphans.length !== 1 ? 's' : ''} from ${totalChanges} note${totalChanges !== 1 ? 's' : ''}`)
-  }, [orphans, notes, loadNotes, rebuildIndex])
+    setBulkReview(null)
+    setResult(`Applied ${Object.keys(mappings).length} tag change${Object.keys(mappings).length !== 1 ? 's' : ''} across ${totalChanges} note${totalChanges !== 1 ? 's' : ''}`)
+  }, [bulkReview, notes, loadNotes, rebuildIndex])
 
   // Fix all detected issues (similar/duplicate tags)
   const fixAllIssues = useCallback(async () => {
@@ -134,48 +216,6 @@ export default function TagCleanup({ onClose }) {
     setResult(`Fixed ${issues.length} issue${issues.length !== 1 ? 's' : ''} across ${totalChanges} note${totalChanges !== 1 ? 's' : ''}`)
   }, [issues, notes, loadNotes, rebuildIndex])
 
-  // Clean everything: fix issues + remove orphans
-  const cleanAll = useCallback(async () => {
-    setProcessing(true)
-    setResult(null)
-
-    let changes = 0
-
-    // Pass 1: fix issues
-    for (const issue of issues) {
-      for (const oldTag of issue.tags) {
-        if (oldTag === issue.suggestion) continue
-        for (const note of notes) {
-          const noteTags = getTags(note)
-          if (!noteTags.includes(oldTag)) continue
-          const updatedTags = [...new Set(noteTags.map(t => t === oldTag ? issue.suggestion : t))]
-          const content = buildNoteContent(note, updatedTags)
-          await apiSaveNote(note.filename, content)
-          changes++
-        }
-      }
-    }
-
-    // Reload after issue fixes to get fresh tag list
-    await loadNotes()
-
-    // Pass 2: remove orphans
-    const freshNotes = useStore.getState().notes
-    const freshHealth = analyzeTagHealth(freshNotes)
-    for (const note of freshNotes) {
-      const noteTags = getTags(note)
-      const cleaned = noteTags.filter(t => !freshHealth.orphans.includes(t))
-      if (cleaned.length === noteTags.length) continue
-      const content = buildNoteContent(note, cleaned)
-      await apiSaveNote(note.filename, content)
-      changes++
-    }
-
-    await loadNotes()
-    rebuildIndex()
-    setProcessing(false)
-    setResult(`Cleaned up: ${issues.length} issues fixed, ${freshHealth.orphans.length} orphans removed (${changes} notes updated)`)
-  }, [issues, notes, loadNotes, rebuildIndex])
 
   const displayTags = useMemo(() => {
     if (filter === 'issues') {
@@ -188,8 +228,6 @@ export default function TagCleanup({ onClose }) {
     }
     return sortedTags
   }, [sortedTags, filter, issues, orphans])
-
-  const hasWork = issues.length > 0 || orphans.length > 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -231,29 +269,21 @@ export default function TagCleanup({ onClose }) {
             ))}
           </div>
 
-          {/* Auto-cleanup buttons */}
-          {hasWork && (
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={cleanAll}
-                disabled={processing}
-                className="btn-primary text-[11px] disabled:opacity-40"
-                style={{ padding: '6px 14px' }}
-              >
-                {processing ? 'Cleaning…' : `Clean All (${issues.length} issues + ${orphans.length} orphans)`}
-              </button>
-              {filter === 'orphans' && orphans.length > 0 && (
-                <button
-                  onClick={removeAllOrphans}
-                  disabled={processing}
-                  className="btn-secondary text-[11px] disabled:opacity-40"
-                  style={{ padding: '6px 12px' }}
-                >
-                  Remove all orphans
-                </button>
-              )}
-            </div>
-          )}
+          {/* AI bulk review — systematic taxonomy pass */}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={runBulkReview}
+              disabled={bulkLoading || processing || tagCounts.size === 0}
+              className="btn-primary text-[11px] disabled:opacity-40"
+              style={{ padding: '6px 14px' }}
+              title="Let Claude design a systematic taxonomy across all tags"
+            >
+              {bulkLoading ? 'Reviewing…' : 'AI Bulk Review'}
+            </button>
+          </div>
+          <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+            Designs a coherent taxonomy, merges duplicates, translates to English, enforces parent/child hierarchy.
+          </p>
 
           {/* Issues detail */}
           {issues.length > 0 && filter === 'issues' && (
@@ -281,9 +311,83 @@ export default function TagCleanup({ onClose }) {
 
         {/* Result banner */}
         {result && (
-          <div className="px-4 py-2 flex items-center justify-between text-xs shrink-0" style={{ background: 'rgba(74,222,128,0.08)', borderBottom: '1px solid rgba(74,222,128,0.15)', color: 'var(--green)' }}>
-            <span>{result}</span>
+          <div
+            className="px-4 py-2 flex items-center justify-between text-xs shrink-0"
+            style={
+              typeof result === 'object' && result.error
+                ? { background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.15)', color: 'var(--red, #f87171)' }
+                : { background: 'rgba(74,222,128,0.08)', borderBottom: '1px solid rgba(74,222,128,0.15)', color: 'var(--green)' }
+            }
+          >
+            <span>{typeof result === 'object' ? result.error : result}</span>
             <button onClick={() => setResult(null)} style={{ opacity: 0.5 }}>&times;</button>
+          </div>
+        )}
+
+        {/* Bulk review preview modal */}
+        {bulkReview && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div
+              className="w-full max-w-md max-h-[90%] flex flex-col rounded-2xl overflow-hidden"
+              style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-strong)' }}
+            >
+              <div className="p-4 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Proposed Taxonomy
+                  </h3>
+                  <button onClick={() => setBulkReview(null)} style={{ color: 'var(--text-muted)', fontSize: 18 }}>&times;</button>
+                </div>
+                {bulkReview.methodology && (
+                  <p className="text-[11px] mt-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--accent-hi)' }}>System:</span> {bulkReview.methodology}
+                  </p>
+                )}
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                {bulkReview.reasoning && (
+                  <div className="mb-3 text-[11px] whitespace-pre-wrap" style={{ color: 'var(--text-muted)' }}>
+                    {bulkReview.reasoning}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {Object.entries(bulkReview.mappings || {}).map(([from, to]) => (
+                    <div key={from} className="flex items-center gap-2 text-xs py-1">
+                      <span className="font-mono truncate" style={{ color: 'var(--text-secondary)' }}>{from}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>→</span>
+                      {to == null ? (
+                        <span className="font-mono" style={{ color: 'var(--red, #f87171)' }}>delete</span>
+                      ) : (
+                        <span className="font-mono truncate" style={{ color: 'var(--accent-hi)' }}>{to}</span>
+                      )}
+                    </div>
+                  ))}
+                  {Object.keys(bulkReview.mappings || {}).length === 0 && (
+                    <p className="text-xs text-center py-4" style={{ color: 'var(--text-muted)' }}>
+                      No changes proposed — your tags are already consistent.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="p-4 flex gap-2 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+                <button
+                  onClick={applyBulkReview}
+                  disabled={processing || Object.keys(bulkReview.mappings || {}).length === 0}
+                  className="btn-primary text-xs flex-1 disabled:opacity-40"
+                  style={{ padding: '8px 14px' }}
+                >
+                  {processing ? 'Applying…' : `Apply ${Object.keys(bulkReview.mappings || {}).length} change${Object.keys(bulkReview.mappings || {}).length !== 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => setBulkReview(null)}
+                  disabled={processing}
+                  className="text-xs px-3 py-2 rounded-lg"
+                  style={{ background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
