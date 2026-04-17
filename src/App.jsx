@@ -12,6 +12,7 @@ import SearchOverlay from './components/SearchOverlay'
 import TimelineView from './components/TimelineView'
 import KnowledgePulse from './components/KnowledgePulse'
 import InsightGenerator from './components/InsightGenerator'
+import VaultInterview from './components/VaultInterview'
 
 // SVG icon components
 const Icons = {
@@ -86,6 +87,13 @@ const Icons2 = {
       <path d="M9 18h6"/><path d="M10 22h4"/>
       <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
     </svg>
+  ),
+  interview: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
   )
 }
 
@@ -97,6 +105,7 @@ const NAV_ITEMS = [
   { key: 'timeline',  label: 'Timeline',  icon: Icons2.timeline },
   { key: 'pulse',     label: 'Pulse',     icon: Icons2.pulse },
   { key: 'insights',  label: 'Insights',  icon: Icons2.insight },
+  { key: 'interview', label: 'Interview', icon: Icons2.interview },
   { key: 'import',    label: 'Import',    icon: Icons.import },
   { key: 'settings',  label: 'Settings',  icon: Icons.settings },
 ]
@@ -248,6 +257,7 @@ export default function App() {
           {activeView === 'timeline'   && <TimelineView />}
           {activeView === 'pulse'      && <KnowledgePulse />}
           {activeView === 'insights'   && <InsightGenerator />}
+          {activeView === 'interview'  && <VaultInterview />}
           {activeView === 'agent'      && <AgentPanel />}
           {activeView === 'import'     && <ImportPanel />}
           {activeView === 'settings'   && <Settings />}
