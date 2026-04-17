@@ -7,57 +7,21 @@ import SourceCitation from './SourceCitation'
 
 const BRAINSTORM_MODES = [
   {
-    key: 'connections',
+    key: 'insights',
     icon: '🔗',
-    label: 'Find Connections',
-    description: 'Discover hidden links between your notes',
-    systemPrompt: (chunks) => `You are a creative thinking partner analyzing a personal knowledge vault.
-Your job is to find surprising, non-obvious connections between different notes and ideas.
-Look for patterns, shared themes, contradictions, and opportunities to combine ideas.
-
-For each connection you find:
-1. Name the two (or more) ideas being connected
-2. Explain the connection clearly
-3. Suggest what new insight or project could emerge from this connection
-
-Be specific — reference actual content from the notes. Be creative but grounded.
-
-=== VAULT CONTEXT ===
-${chunks}
-=== END CONTEXT ===`
+    label: 'Vault Insights',
+    description: 'Patterns, connections, gaps — full vault analysis',
+    isFullVault: true,
+    systemPrompt: () => `You are a knowledge management advisor analyzing a personal knowledge vault. Be specific — reference actual note titles and tags. Write in structured markdown with clear sections. Focus on actionable insights.`
   },
   {
-    key: 'ideas',
+    key: 'brainstorm',
     icon: '💡',
-    label: 'Generate Ideas',
-    description: 'Brainstorm new ideas from your existing knowledge',
-    systemPrompt: (chunks) => `You are a creative brainstorming partner with access to the user's personal knowledge vault.
-Generate 5-7 creative, actionable ideas based on the user's notes and interests.
-Each idea should:
-1. Build on something already in their vault
-2. Be specific and actionable (not vague)
-3. Include a concrete next step
-
-Format each idea with a bold title and 2-3 sentences explaining it.
-
-=== VAULT CONTEXT ===
-${chunks}
-=== END CONTEXT ===`
-  },
-  {
-    key: 'gaps',
-    icon: '🔍',
-    label: 'Knowledge Gaps',
-    description: 'Find what\'s missing from your understanding',
-    systemPrompt: (chunks) => `You are a research advisor analyzing a personal knowledge vault.
-Identify gaps, blind spots, and areas where the user's knowledge could be deeper.
-For each gap:
-1. What topic is underdeveloped
-2. Why it matters given their other notes
-3. 2-3 specific questions they should research
-4. Suggest what kind of note they should create to fill this gap
-
-Be constructive, not critical. Frame gaps as opportunities.
+    label: 'Brainstorm',
+    description: 'Generate ideas or think through any question',
+    systemPrompt: (chunks) => `You are a creative thinking partner with access to the user's personal knowledge vault.
+Help them brainstorm, generate ideas, and think through problems based on their notes.
+Always reference specific notes when relevant. Be specific, actionable, and grounded in what's in their vault.
 
 === VAULT CONTEXT ===
 ${chunks}
@@ -110,27 +74,6 @@ Be concise and actionable.
 === VAULT CONTEXT ===
 ${chunks}
 === END CONTEXT ===`
-  },
-  {
-    key: 'freeform',
-    icon: '✨',
-    label: 'Free Brainstorm',
-    description: 'Ask anything about your vault',
-    systemPrompt: (chunks) => `You are a creative thinking partner with access to the user's personal knowledge vault.
-Help them brainstorm, think through problems, and generate insights based on their notes.
-Always reference specific notes when relevant. Be creative and proactive with suggestions.
-
-=== VAULT CONTEXT ===
-${chunks}
-=== END CONTEXT ===`
-  },
-  {
-    key: 'insights',
-    icon: '💡',
-    label: 'Vault Insights',
-    description: 'AI analyzes patterns across all your notes',
-    isFullVault: true,
-    systemPrompt: () => `You are a knowledge management advisor analyzing a personal knowledge vault. Be specific, reference actual note titles and tags. Write in concise bullet points with markdown formatting. Focus on actionable insights.`
   },
   {
     key: 'interview',
@@ -223,11 +166,8 @@ export default function BrainstormPanel() {
       userMessage = userQuery
         ? userQuery
         : selectedMode === 'digest' ? `Create a digest of my vault. I have ${notes.length} notes.`
-        : selectedMode === 'connections' ? 'Find the most interesting hidden connections in my vault.'
-        : selectedMode === 'ideas' ? 'Generate creative ideas based on everything in my vault.'
-        : selectedMode === 'gaps' ? 'What knowledge gaps do you see in my vault?'
         : selectedMode === 'challenge' ? 'Challenge the key assumptions and ideas in my vault.'
-        : 'Help me think.'
+        : 'Help me think about what I\'ve captured in my vault.'
     }
 
     try {
@@ -291,7 +231,7 @@ export default function BrainstormPanel() {
             {BRAINSTORM_MODES.map(m => (
               <button
                 key={m.key}
-                onClick={() => { setMode(m.key); setConversationMessages([]); if (m.key !== 'freeform') handleRun(m.key) }}
+                onClick={() => { setMode(m.key); setConversationMessages([]); if (m.key !== 'brainstorm') handleRun(m.key) }}
                 className="text-left bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-indigo-500/50 hover:bg-gray-900/80 transition-colors group"
               >
                 <div className="text-2xl mb-2">{m.icon}</div>
@@ -369,7 +309,7 @@ export default function BrainstormPanel() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleRun(mode, input)}
-            placeholder={mode === 'interview' ? 'Answer the question...' : mode === 'freeform' ? 'What do you want to brainstorm about?' : 'Ask a follow-up question...'}
+            placeholder={mode === 'interview' ? 'Answer the question...' : mode === 'brainstorm' ? 'What do you want to brainstorm about?' : 'Ask a follow-up question...'}
             className="flex-1 bg-gray-800 text-gray-200 text-sm rounded-xl px-4 py-3 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
             disabled={loading}
           />
