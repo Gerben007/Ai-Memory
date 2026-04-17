@@ -2,17 +2,12 @@ import { useEffect, useState } from 'react'
 import { useStore } from './lib/store'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
-import ChatPanel from './components/ChatPanel'
 import BrainstormPanel from './components/BrainstormPanel'
 import GraphView from './components/GraphView'
 import AgentPanel from './components/AgentPanel'
-import ImportPanel from './components/ImportPanel'
 import Settings from './components/Settings'
 import SearchOverlay from './components/SearchOverlay'
-import TimelineView from './components/TimelineView'
 import KnowledgePulse from './components/KnowledgePulse'
-import InsightGenerator from './components/InsightGenerator'
-import VaultInterview from './components/VaultInterview'
 
 // SVG icon components
 const Icons = {
@@ -99,38 +94,23 @@ const Icons2 = {
 
 const NAV_ITEMS = [
   { key: 'editor',    label: 'Notes',     icon: Icons.notes },
-  { key: 'chat',      label: 'AI Chat',   icon: Icons.chat },
-  { key: 'brainstorm',label: 'Brainstorm',icon: Icons.brainstorm },
+  { key: 'brainstorm',label: 'AI Studio', icon: Icons.brainstorm },
   { key: 'graph',     label: 'Graph',     icon: Icons.graph },
-  { key: 'timeline',  label: 'Timeline',  icon: Icons2.timeline },
   { key: 'pulse',     label: 'Pulse',     icon: Icons2.pulse },
-  { key: 'insights',  label: 'Insights',  icon: Icons2.insight },
-  { key: 'interview', label: 'Interview', icon: Icons2.interview },
-  { key: 'import',    label: 'Import',    icon: Icons.import },
   { key: 'settings',  label: 'Settings',  icon: Icons.settings },
 ]
 
-// Mobile bottom nav — 4 key items + More button
+// Mobile bottom nav
 const MOBILE_NAV = [
   { key: 'editor',    label: 'Notes',    icon: Icons.notes },
-  { key: 'chat',      label: 'Chat',     icon: Icons.chat },
+  { key: 'brainstorm',label: 'AI',       icon: Icons.brainstorm },
   { key: 'graph',     label: 'Graph',    icon: Icons.graph },
+  { key: 'pulse',     label: 'Pulse',    icon: Icons2.pulse },
   { key: 'search',    label: 'Search',   icon: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
   )},
-]
-
-// All other features accessible via "More" button on mobile
-const MOBILE_MORE = [
-  { key: 'timeline',  label: 'Timeline',  icon: Icons2.timeline },
-  { key: 'pulse',     label: 'Knowledge Pulse', icon: Icons2.pulse },
-  { key: 'insights',  label: 'AI Insights',     icon: Icons2.insight },
-  { key: 'interview', label: 'Vault Interview', icon: Icons2.interview },
-  { key: 'brainstorm',label: 'Brainstorm', icon: Icons.brainstorm },
-  { key: 'import',    label: 'Import Files', icon: Icons.import },
-  { key: 'settings',  label: 'Settings', icon: Icons.settings },
 ]
 
 export default function App() {
@@ -143,7 +123,6 @@ export default function App() {
   const initialized = useStore(s => s.initialized)
   const [panelOpen, setPanelOpen] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
-  const [showMobileMore, setShowMobileMore] = useState(false)
 
   // Ctrl+K / Cmd+K to open search
   useEffect(() => {
@@ -266,15 +245,10 @@ export default function App() {
         {/* View content */}
         <div className="flex-1 overflow-hidden">
           {activeView === 'editor'     && <Editor />}
-          {activeView === 'chat'       && <ChatPanel />}
           {activeView === 'brainstorm' && <BrainstormPanel />}
           {activeView === 'graph'      && <GraphView />}
-          {activeView === 'timeline'   && <TimelineView />}
           {activeView === 'pulse'      && <KnowledgePulse />}
-          {activeView === 'insights'   && <InsightGenerator />}
-          {activeView === 'interview'  && <VaultInterview />}
           {activeView === 'agent'      && <AgentPanel />}
-          {activeView === 'import'     && <ImportPanel />}
           {activeView === 'settings'   && <Settings />}
         </div>
       </main>
@@ -298,57 +272,7 @@ export default function App() {
             )}
           </button>
         ))}
-        {/* More button */}
-        <button
-          onClick={() => setShowMobileMore(true)}
-          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
-          style={{ color: MOBILE_MORE.some(m => m.key === activeView) ? 'var(--accent-hi)' : 'var(--text-muted)' }}
-        >
-          <span className="scale-90">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
-            </svg>
-          </span>
-          <span className="text-[9.5px] font-medium">More</span>
-          {MOBILE_MORE.some(m => m.key === activeView) && (
-            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent)' }} />
-          )}
-        </button>
       </nav>
-
-      {/* ── Mobile More menu ────────────────────────────────────── */}
-      {showMobileMore && (
-        <div className="md:hidden fixed inset-0 z-50 flex items-end" onClick={() => setShowMobileMore(false)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            className="relative w-full rounded-t-2xl overflow-hidden animate-fadeIn"
-            style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-strong)', borderBottom: 0 }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>More</span>
-              <button onClick={() => setShowMobileMore(false)} style={{ color: 'var(--text-muted)', fontSize: 20 }}>&times;</button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 p-3">
-              {MOBILE_MORE.map(item => (
-                <button
-                  key={item.key}
-                  onClick={() => { handleNavClick(item.key); setShowMobileMore(false) }}
-                  className="flex flex-col items-center gap-2 px-3 py-4 rounded-xl transition-colors"
-                  style={{
-                    background: activeView === item.key ? 'var(--accent-soft)' : 'var(--bg-surface)',
-                    border: `1px solid ${activeView === item.key ? 'var(--accent)' : 'var(--border)'}`,
-                    color: activeView === item.key ? 'var(--accent-hi)' : 'var(--text-secondary)'
-                  }}
-                >
-                  <span>{item.icon}</span>
-                  <span className="text-xs font-medium">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Search overlay ──────────────────────────────────────── */}
       {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}

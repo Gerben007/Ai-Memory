@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
 import { chatCompletion } from '../lib/api'
+import { getTitle, getTags, getBody, getAllTagsWithCounts } from '../lib/tagUtils'
 import SourceCitation from './SourceCitation'
 
 const BRAINSTORM_MODES = [
@@ -122,6 +123,23 @@ Always reference specific notes when relevant. Be creative and proactive with su
 === VAULT CONTEXT ===
 ${chunks}
 === END CONTEXT ===`
+  },
+  {
+    key: 'insights',
+    icon: '💡',
+    label: 'Vault Insights',
+    description: 'AI analyzes patterns across all your notes',
+    isFullVault: true,
+    systemPrompt: () => `You are a knowledge management advisor analyzing a personal knowledge vault. Be specific, reference actual note titles and tags. Write in concise bullet points with markdown formatting. Focus on actionable insights.`
+  },
+  {
+    key: 'interview',
+    icon: '❓',
+    label: 'Vault Interview',
+    description: 'AI asks you questions to understand you better',
+    isFullVault: true,
+    isConversational: true,
+    systemPrompt: () => ''
   }
 ]
 
@@ -137,6 +155,7 @@ export default function BrainstormPanel() {
   const apiKey = useStore(s => s.apiKey)
   const model = useStore(s => s.model)
   const notes = useStore(s => s.notes)
+  const vaultContext = useStore(s => s.vaultContext)
   const setActiveView = useStore(s => s.setActiveView)
   const quickCapture = useStore(s => s.quickCapture)
 
@@ -146,7 +165,17 @@ export default function BrainstormPanel() {
   const [sources, setSources] = useState([])
   const [loading, setLoading] = useState(false)
   const [savedIdea, setSavedIdea] = useState('')
+  const [conversationMessages, setConversationMessages] = useState([])
   const responseRef = useRef(null)
+
+  // Full vault summary for insights/interview modes
+  const vaultSummary = useMemo(() => {
+    const tagCounts = getAllTagsWithCounts(notes)
+    const topTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)
+    const titles = notes.map(n => `- ${getTitle(n)} [${getTags(n).join(', ')}]`).join('\n')
+    const totalWords = notes.reduce((sum, n) => sum + (getBody(n) || '').split(/\s+/).filter(Boolean).length, 0)
+    return { noteCount: notes.length, tagCount: tagCounts.size, totalWords, topTags: topTags.map(([t, c]) => `${t}(${c})`).join(', '), titles }
+  }, [notes])
 
   useEffect(() => {
     if (responseRef.current) responseRef.current.scrollTop = responseRef.current.scrollHeight
@@ -165,40 +194,52 @@ export default function BrainstormPanel() {
     setResponse('')
     setSources([])
 
-    // Get broad context from vault
-    const query = userQuery || modeConfig.label
-    const results = search(query, 15)
-    const context = buildContext(results)
+    let systemPrompt, userMessage
 
-    const srcList = results.map(r => ({
-      filename: r.chunk.noteFilename,
-      noteTitle: r.chunk.noteTitle,
-      heading: r.chunk.heading,
-      score: r.score
-    }))
-    setSources(srcList)
+    if (modeConfig.isFullVault) {
+      // Full vault analysis modes (Insights, Interview)
+      const vaultInfo = `**Stats**: ${vaultSummary.noteCount} notes, ${vaultSummary.tagCount} tags, ~${vaultSummary.totalWords.toLocaleString()} words\n**Top tags**: ${vaultSummary.topTags}\n**Notes**:\n${vaultSummary.titles}`
 
-    const systemPrompt = modeConfig.systemPrompt(context)
-    const userMessage = userQuery
-      ? userQuery
-      : selectedMode === 'digest'
-        ? `Create a digest of my vault. I have ${notes.length} notes.`
-        : selectedMode === 'connections'
-          ? 'Find the most interesting hidden connections in my vault.'
-          : selectedMode === 'ideas'
-            ? 'Generate creative ideas based on everything in my vault.'
-            : selectedMode === 'gaps'
-              ? 'What knowledge gaps do you see in my vault?'
-              : selectedMode === 'challenge'
-                ? 'Challenge the key assumptions and ideas in my vault.'
-                : 'Help me think.'
+      if (selectedMode === 'insights') {
+        systemPrompt = modeConfig.systemPrompt()
+        userMessage = `Analyze my knowledge vault and give me insights:\n\n${vaultInfo}\n\n${vaultContext ? `Current profile:\n${vaultContext}` : ''}\n\nTell me:\n1. **Knowledge clusters** — What topics am I focused on?\n2. **Gaps** — What areas seem underdeveloped?\n3. **Connection opportunities** — Which notes should be linked?\n4. **Tag suggestions** — Tags to merge, split, or create?\n5. **One surprising observation**`
+      } else if (selectedMode === 'interview') {
+        systemPrompt = `You are a personal knowledge vault analyst. Interview the user to understand them deeply. You have their vault:\n\n${vaultInfo}\n\n${vaultContext ? `Current profile:\n${vaultContext}` : ''}\n\nAsk ONE focused, specific question at a time based on gaps you see in the vault. Reference actual note titles. Do NOT ask generic questions.`
+
+        if (conversationMessages.length === 0) {
+          userMessage = 'Analyze my vault and ask your first question about something you want to understand better.'
+        } else {
+          userMessage = userQuery || input
+        }
+      }
+    } else {
+      // BM25-based modes
+      const query = userQuery || modeConfig.label
+      const results = search(query, 15)
+      const context = buildContext(results)
+      setSources(results.map(r => ({ filename: r.chunk.noteFilename, noteTitle: r.chunk.noteTitle, heading: r.chunk.heading, score: r.score })))
+      systemPrompt = modeConfig.systemPrompt(context)
+
+      userMessage = userQuery
+        ? userQuery
+        : selectedMode === 'digest' ? `Create a digest of my vault. I have ${notes.length} notes.`
+        : selectedMode === 'connections' ? 'Find the most interesting hidden connections in my vault.'
+        : selectedMode === 'ideas' ? 'Generate creative ideas based on everything in my vault.'
+        : selectedMode === 'gaps' ? 'What knowledge gaps do you see in my vault?'
+        : selectedMode === 'challenge' ? 'Challenge the key assumptions and ideas in my vault.'
+        : 'Help me think.'
+    }
 
     try {
+      const messages = modeConfig.isConversational && conversationMessages.length > 0
+        ? [...conversationMessages, { role: 'user', content: userMessage }]
+        : [{ role: 'user', content: userMessage }]
+
       const res = await chatCompletion({
         model,
         max_tokens: 2048,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
+        messages,
         stream: false
       }, apiKey)
 
@@ -207,6 +248,9 @@ export default function BrainstormPanel() {
 
       if (text) {
         setResponse(text)
+        if (modeConfig.isConversational) {
+          setConversationMessages([...messages, { role: 'assistant', content: text }])
+        }
       } else {
         setResponse('No response received. Try clicking **Regenerate**.')
       }
@@ -215,11 +259,11 @@ export default function BrainstormPanel() {
       const isRateLimit = err.type === 'rate_limit_error' || err.status === 429
       const detail = err.detail ? `\n\n*Debug: ${err.detail}*` : ''
       if (isOverload) {
-        setResponse(`**Anthropic API is overloaded.** This happens during peak usage. Wait 30 seconds and click **Regenerate** to try again.${detail}`)
+        setResponse(`**Anthropic API is overloaded.** Wait 30 seconds and try again.${detail}`)
       } else if (isRateLimit) {
-        setResponse(`**Rate limit reached.** You're sending requests too quickly. Wait a minute and try again.${detail}`)
+        setResponse(`**Rate limit reached.** Wait a minute and try again.${detail}`)
       } else {
-        setResponse(`**Error:** ${err.message}\n\nCheck your API key in Settings, or try again in a moment.${detail}`)
+        setResponse(`**Error:** ${err.message}\n\nCheck your API key in Settings.${detail}`)
       }
     } finally {
       setLoading(false)
@@ -239,7 +283,7 @@ export default function BrainstormPanel() {
     return (
       <div className="flex flex-col h-full">
         <div className="border-b border-gray-800 px-4 py-3 md:px-5 bg-gray-900/50">
-          <h2 className="text-base md:text-lg font-semibold text-gray-200">🧠 Brainstorm</h2>
+          <h2 className="text-base md:text-lg font-semibold text-gray-200">AI Studio</h2>
           <p className="text-[10px] md:text-xs text-gray-500 mt-0.5">AI-powered thinking tools for your vault</p>
         </div>
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
@@ -247,7 +291,7 @@ export default function BrainstormPanel() {
             {BRAINSTORM_MODES.map(m => (
               <button
                 key={m.key}
-                onClick={() => { setMode(m.key); if (m.key !== 'freeform') handleRun(m.key) }}
+                onClick={() => { setMode(m.key); setConversationMessages([]); if (m.key !== 'freeform') handleRun(m.key) }}
                 className="text-left bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-indigo-500/50 hover:bg-gray-900/80 transition-colors group"
               >
                 <div className="text-2xl mb-2">{m.icon}</div>
@@ -278,7 +322,7 @@ export default function BrainstormPanel() {
     <div className="flex flex-col h-full">
       <div className="border-b border-gray-800 px-4 py-3 md:px-5 bg-gray-900/50 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <button onClick={() => { setMode(null); setResponse(''); setSources([]) }} className="text-gray-400 hover:text-gray-200 text-sm shrink-0">&larr;</button>
+          <button onClick={() => { setMode(null); setResponse(''); setSources([]); setConversationMessages([]) }} className="text-gray-400 hover:text-gray-200 text-sm shrink-0">&larr;</button>
           <div className="min-w-0">
             <h2 className="text-sm md:text-base font-semibold text-gray-200 truncate">{currentMode?.icon} {currentMode?.label}</h2>
           </div>
@@ -325,7 +369,7 @@ export default function BrainstormPanel() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleRun(mode, input)}
-            placeholder={mode === 'freeform' ? 'What do you want to brainstorm about?' : 'Ask a follow-up question...'}
+            placeholder={mode === 'interview' ? 'Answer the question...' : mode === 'freeform' ? 'What do you want to brainstorm about?' : 'Ask a follow-up question...'}
             className="flex-1 bg-gray-800 text-gray-200 text-sm rounded-xl px-4 py-3 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
             disabled={loading}
           />

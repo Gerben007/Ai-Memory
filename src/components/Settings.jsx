@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { getAllTagsWithCounts } from '../lib/tagUtils'
 import TagCleanup from './TagCleanup'
-import WebClipper from './WebClipper'
 import AgentPanel from './AgentPanel'
 import JSZip from 'jszip'
 
@@ -315,11 +314,6 @@ export default function Settings() {
               </button>
             )}
           </div>
-        </section>
-
-        {/* Web Clipper */}
-        <section>
-          <WebClipper />
         </section>
 
         {/* Agent API */}
