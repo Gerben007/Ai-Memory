@@ -443,7 +443,7 @@ Rules:
             <button
               onClick={handleAutoTag}
               disabled={autoTagging || !body.trim()}
-              className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+              className="inline-flex items-center gap-1.5 text-[11px] px-2 sm:px-2.5 py-1.5 rounded-lg transition-all"
               style={{
                 border: '1px solid var(--border)',
                 color: 'var(--accent-hi)',
@@ -453,19 +453,19 @@ Rules:
               title="Auto-generate tags from content"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              {autoTagging ? 'Tagging…' : 'Auto-tag'}
+              <span className="hidden sm:inline">{autoTagging ? 'Tagging…' : 'Auto-tag'}</span>
             </button>
 
             {/* Split */}
             {canSplit && (
               <button
                 onClick={() => setShowSplitConfirm(true)}
-                className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+                className="inline-flex items-center gap-1.5 text-[11px] px-2 sm:px-2.5 py-1.5 rounded-lg transition-all"
                 style={{ border: '1px solid var(--border)', color: 'var(--text-secondary)', background: 'transparent' }}
                 title={`Split into ${detectSections.length} notes`}
               >
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                Split
+                <span className="hidden sm:inline">Split</span>
               </button>
             )}
 
@@ -481,7 +481,7 @@ Rules:
             {/* Preview toggle */}
             <button
               onClick={() => setShowPreview(!showPreview)}
-              className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-all"
+              className="inline-flex items-center gap-1.5 text-[11px] px-2 sm:px-2.5 py-1.5 rounded-lg transition-all"
               style={{
                 border: '1px solid var(--border)',
                 color: showPreview ? 'var(--text-primary)' : 'var(--text-muted)',
@@ -489,7 +489,7 @@ Rules:
               }}
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              {showPreview ? 'Preview' : 'Preview'}
+              <span className="hidden sm:inline">Preview</span>
             </button>
 
             {/* Delete */}
@@ -866,7 +866,7 @@ Rules:
           </div>
 
           {/* Backlinks + Related Notes — bottom of editor */}
-          <div className="shrink-0 hidden sm:block" style={{ background: 'var(--bg-panel)' }}>
+          <div className="shrink-0" style={{ background: 'var(--bg-panel)' }}>
             <BacklinksPanel noteFilename={activeNoteFilename} />
             <RelatedNotes noteFilename={activeNoteFilename} />
           </div>

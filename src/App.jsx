@@ -110,12 +110,26 @@ const NAV_ITEMS = [
   { key: 'settings',  label: 'Settings',  icon: Icons.settings },
 ]
 
-// Mobile bottom nav — fewer items
+// Mobile bottom nav — 4 key items + More button
 const MOBILE_NAV = [
   { key: 'editor',    label: 'Notes',    icon: Icons.notes },
   { key: 'chat',      label: 'Chat',     icon: Icons.chat },
   { key: 'graph',     label: 'Graph',    icon: Icons.graph },
-  { key: 'import',    label: 'Import',   icon: Icons.import },
+  { key: 'search',    label: 'Search',   icon: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  )},
+]
+
+// All other features accessible via "More" button on mobile
+const MOBILE_MORE = [
+  { key: 'timeline',  label: 'Timeline',  icon: Icons2.timeline },
+  { key: 'pulse',     label: 'Knowledge Pulse', icon: Icons2.pulse },
+  { key: 'insights',  label: 'AI Insights',     icon: Icons2.insight },
+  { key: 'interview', label: 'Vault Interview', icon: Icons2.interview },
+  { key: 'brainstorm',label: 'Brainstorm', icon: Icons.brainstorm },
+  { key: 'import',    label: 'Import Files', icon: Icons.import },
   { key: 'settings',  label: 'Settings', icon: Icons.settings },
 ]
 
@@ -129,6 +143,7 @@ export default function App() {
   const initialized = useStore(s => s.initialized)
   const [panelOpen, setPanelOpen] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [showMobileMore, setShowMobileMore] = useState(false)
 
   // Ctrl+K / Cmd+K to open search
   useEffect(() => {
@@ -233,7 +248,7 @@ export default function App() {
       )}
 
       {/* ── Main content ────────────────────────────────────────── */}
-      <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0 pb-[58px] md:pb-0">
         {/* Mobile top bar */}
         <div
           className="flex items-center gap-3 px-4 py-2.5 shrink-0 md:hidden"
@@ -272,7 +287,7 @@ export default function App() {
         {MOBILE_NAV.map(item => (
           <button
             key={item.key}
-            onClick={() => handleNavClick(item.key)}
+            onClick={() => item.key === 'search' ? setShowSearch(true) : handleNavClick(item.key)}
             className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
             style={{ color: activeView === item.key ? 'var(--accent-hi)' : 'var(--text-muted)' }}
           >
@@ -283,7 +298,57 @@ export default function App() {
             )}
           </button>
         ))}
+        {/* More button */}
+        <button
+          onClick={() => setShowMobileMore(true)}
+          className="flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors"
+          style={{ color: MOBILE_MORE.some(m => m.key === activeView) ? 'var(--accent-hi)' : 'var(--text-muted)' }}
+        >
+          <span className="scale-90">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+            </svg>
+          </span>
+          <span className="text-[9.5px] font-medium">More</span>
+          {MOBILE_MORE.some(m => m.key === activeView) && (
+            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--accent)' }} />
+          )}
+        </button>
       </nav>
+
+      {/* ── Mobile More menu ────────────────────────────────────── */}
+      {showMobileMore && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-end" onClick={() => setShowMobileMore(false)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full rounded-t-2xl overflow-hidden animate-fadeIn"
+            style={{ background: 'var(--bg-panel)', border: '1px solid var(--border-strong)', borderBottom: 0 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>More</span>
+              <button onClick={() => setShowMobileMore(false)} style={{ color: 'var(--text-muted)', fontSize: 20 }}>&times;</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 p-3">
+              {MOBILE_MORE.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => { handleNavClick(item.key); setShowMobileMore(false) }}
+                  className="flex flex-col items-center gap-2 px-3 py-4 rounded-xl transition-colors"
+                  style={{
+                    background: activeView === item.key ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                    border: `1px solid ${activeView === item.key ? 'var(--accent)' : 'var(--border)'}`,
+                    color: activeView === item.key ? 'var(--accent-hi)' : 'var(--text-secondary)'
+                  }}
+                >
+                  <span>{item.icon}</span>
+                  <span className="text-xs font-medium">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Search overlay ──────────────────────────────────────── */}
       {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}

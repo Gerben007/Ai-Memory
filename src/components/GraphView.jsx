@@ -6,16 +6,16 @@ import { renderMarkdown } from '../lib/markdownParser'
 import { getTagColor, getTags, isGenericTag } from '../lib/tagUtils'
 
 // Physics constants are scaled by screen size in the simulation loop
-const BASE_REPULSION = 25000
-const BASE_SPRING_STRENGTH = 0.008
-const BASE_IDEAL_LENGTH = 350
+const BASE_REPULSION = 12000
+const BASE_SPRING_STRENGTH = 0.025
+const BASE_IDEAL_LENGTH = 180
 const GRAVITY = 0       // no center pull — nodes float freely
-const DAMPING = 0.88
-const INITIAL_TEMP = 0.8
-const COOLING = 0.995
+const DAMPING = 0.85
+const INITIAL_TEMP = 1.2
+const COOLING = 0.996
 const MIN_TEMP = 0.01
-const DRIFT = 0.008     // barely perceptible floating
-const MAX_VEL = 4        // cap velocity to prevent shooting
+const DRIFT = 0.005     // barely perceptible floating
+const MAX_VEL = 6
 
 function hashCode(str) {
   let hash = 0
@@ -308,11 +308,11 @@ export default function GraphView() {
     // Use the larger dimension — spread wider with more notes
     const maxR = Math.max(w, h) * (n > 50 ? 0.6 : 0.4)
     for (let i = 0; i < n; i++) {
-      // Spread in an ellipse matching the screen aspect ratio
-      const a = (2 * Math.PI * i) / n + (Math.random() - 0.5) * 0.3
-      const r = maxR * (0.3 + Math.random() * 0.7)
-      data.nodes[i].x = w / 2 + Math.cos(a) * r * (w / Math.max(w, h))
-      data.nodes[i].y = h / 2 + Math.sin(a) * r * (h / Math.max(w, h))
+      // Random scatter near center — physics will organize them into clusters
+      const a = Math.random() * 2 * Math.PI
+      const r = Math.random() * maxR * 0.5
+      data.nodes[i].x = w / 2 + Math.cos(a) * r
+      data.nodes[i].y = h / 2 + Math.sin(a) * r
     }
     graphRef.current = data
     setAllTags(data.allTags)
@@ -435,9 +435,9 @@ export default function GraphView() {
         const isHl = hoverId === s.id || hoverId === t.id
         const dimmed = filterTag && !(edge.sharedTags && edge.sharedTags.includes(filterTag)) && !isHl
 
-        ctx.globalAlpha = dimmed ? 0.02 : (isHl ? 0.5 : 0.08)
-        ctx.strokeStyle = isHl ? '#94a3b8' : '#334155'
-        ctx.lineWidth = isHl ? 1.5 : 0.5
+        ctx.globalAlpha = dimmed ? 0.03 : (isHl ? 0.7 : 0.22)
+        ctx.strokeStyle = isHl ? '#cbd5e1' : '#475569'
+        ctx.lineWidth = isHl ? 1.5 : 0.7
         ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(t.x, t.y); ctx.stroke()
         ctx.globalAlpha = 1
       }
