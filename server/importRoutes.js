@@ -3,6 +3,21 @@ import multer from 'multer'
 import fs from 'fs/promises'
 import path from 'path'
 
+function yamlQuote(value) {
+  const s = String(value ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+  return `"${escaped}"`
+}
+
+function sanitizeTag(tag) {
+  return String(tag ?? '').replace(/[^A-Za-z0-9/_-]/g, '').slice(0, 64)
+}
+
 // Native-heavy deps loaded lazily to avoid SIGILL on older CPUs (Alpine + older Xeon etc.)
 let _PDFParse, _XLSX, _mammoth, _simpleParser
 async function loadParser(name) {
@@ -169,8 +184,9 @@ Return ONLY the JSON array, no other text.`
           finalFilename = `${slug}-${Date.now().toString(36)}.md`
         }
 
-        const tags = Array.isArray(note.tags) ? note.tags : ['import']
-        const content = `---\ntitle: "${noteTitle.replace(/"/g, '\\"')}"\ntags: [${tags.join(', ')}]\ncreated: ${now}\nupdated: ${now}\nsource: import\n---\n\n${note.content || ''}\n`
+        const rawTags = Array.isArray(note.tags) && note.tags.length ? note.tags : ['import']
+        const tags = rawTags.map(sanitizeTag).filter(Boolean)
+        const content = `---\ntitle: ${yamlQuote(noteTitle)}\ntags: [${tags.join(', ')}]\ncreated: ${now}\nupdated: ${now}\nsource: import\n---\n\n${note.content || ''}\n`
 
         await fs.writeFile(path.join(vaultDir, finalFilename), content, 'utf-8')
         results.push({ filename: finalFilename, title: noteTitle, tags })

@@ -87,6 +87,24 @@ app.post('/api/context', (req, res) => {
   }
 })
 
+// Escape a value for use inside a YAML double-quoted scalar. Prevents frontmatter
+// injection when the value contains quotes, backslashes, or newlines.
+function yamlQuote(value) {
+  const s = String(value ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+  return `"${escaped}"`
+}
+
+// Keep tag values to a safe shape so we never break out of the YAML list.
+function sanitizeTag(tag) {
+  return String(tag ?? '').replace(/[^A-Za-z0-9/_-]/g, '').slice(0, 64)
+}
+
 // Web clipper — POST /api/clip to capture content from bookmarklet/extension
 app.post('/api/clip', (req, res) => {
   try {
@@ -99,9 +117,10 @@ app.post('/api/clip', (req, res) => {
     const filePath = path.join(VAULT_DIR, filename)
     if (fs.existsSync(filePath)) filename = `clip-${slug}-${Date.now().toString(36)}.md`
 
-    const tagStr = (tags || ['clip']).join(', ')
-    const urlLine = url ? `source: "${url}"\n` : ''
-    const noteContent = `---\ntitle: "${title.replace(/"/g, '\\"')}"\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
+    const safeTags = (Array.isArray(tags) && tags.length ? tags : ['clip']).map(sanitizeTag).filter(Boolean)
+    const tagStr = safeTags.join(', ')
+    const urlLine = url ? `source: ${yamlQuote(url)}\n` : ''
+    const noteContent = `---\ntitle: ${yamlQuote(title)}\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
 
     fs.writeFileSync(path.join(VAULT_DIR, filename), noteContent, 'utf-8')
     res.json({ filename, title })
