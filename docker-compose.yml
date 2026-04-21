@@ -12,13 +12,11 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_SESSION_DAYS=${AUTH_SESSION_DAYS:-30}
 
   # ProtonMail Bridge — IMAP access to vault@stratusfinance.co.za
-  # One-time setup after first deploy:
-  #   docker exec -it protonmail-bridge /bin/bash
-  #   protonmail-bridge --cli
-  #   > login  (enter vault@stratusfinance.co.za credentials)
-  #   > info   (note the Bridge IMAP password)
   protonmail-bridge:
     image: shenxn/protonmail-bridge
     container_name: protonmail-bridge
@@ -28,15 +26,7 @@ services:
     profiles:
       - email
 
-  # Cloudflare Tunnel — exposes vault externally via your domain
-  # To set up:
-  #   1. Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/
-  #   2. Run: cloudflared tunnel login
-  #   3. Run: cloudflared tunnel create knowledge-vault
-  #   4. Copy the tunnel token
-  #   5. Set CLOUDFLARE_TUNNEL_TOKEN in .env or replace below
-  #   6. In Cloudflare Zero Trust dashboard, add a public hostname
-  #      pointing to your tunnel (e.g. vault.yourdomain.com → http://knowledge-vault:3001)
+  # Cloudflare Tunnel
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: vault-tunnel

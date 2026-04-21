@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './lib/store'
+import { fetchAuthStatus } from './lib/auth'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import BrainstormPanel from './components/BrainstormPanel'
@@ -8,6 +9,7 @@ import AgentPanel from './components/AgentPanel'
 import Settings from './components/Settings'
 import SearchOverlay from './components/SearchOverlay'
 import KnowledgePulse from './components/KnowledgePulse'
+import LoginScreen from './components/LoginScreen'
 
 // SVG icon components
 const Icons = {
@@ -123,6 +125,7 @@ export default function App() {
   const initialized = useStore(s => s.initialized)
   const [panelOpen, setPanelOpen] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
+  const [authState, setAuthState] = useState({ status: 'checking', required: false, authenticated: false })
 
   // Ctrl+K / Cmd+K to open search
   useEffect(() => {
@@ -136,7 +139,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
 
+  // Check auth status on mount before loading anything
   useEffect(() => {
+    fetchAuthStatus().then(s => {
+      setAuthState({ status: 'ready', required: !!s.required, authenticated: !!s.authenticated })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (authState.status !== 'ready') return
+    if (authState.required && !authState.authenticated) return
     async function init() {
       await loadConfig()
       await loadNotes()
@@ -144,11 +156,30 @@ export default function App() {
       loadContext()
     }
     init()
-  }, [loadNotes, loadConfig, loadContext, rebuildIndex])
+  }, [authState, loadNotes, loadConfig, loadContext, rebuildIndex])
 
   const handleNavClick = (view) => {
     setActiveView(view)
     setPanelOpen(false)
+  }
+
+  if (authState.status === 'checking') {
+    return (
+      <div className="h-dvh flex items-center justify-center app-bg">
+        <div className="text-center">
+          <div className="text-gradient text-xl font-semibold tracking-tight mb-1">Knowledge Vault</div>
+          <div className="text-xs text-[var(--text-muted)] tracking-widest uppercase">Loading</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (authState.required && !authState.authenticated) {
+    return (
+      <LoginScreen
+        onAuthenticated={() => setAuthState(s => ({ ...s, authenticated: true }))}
+      />
+    )
   }
 
   if (!initialized) {

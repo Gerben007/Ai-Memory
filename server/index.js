@@ -7,6 +7,7 @@ import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
 import { createEmailPoller } from './emailPoller.js'
+import { createAuth } from './auth.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -29,9 +30,17 @@ if (!fs.existsSync(VAULT_DIR)) {
   fs.mkdirSync(VAULT_DIR, { recursive: true })
 }
 
-app.use(cors())
+// Trust first proxy hop (cloudflared / reverse proxy) so req.secure + req.ip work
+app.set('trust proxy', 1)
+
+app.use(cors({ origin: true, credentials: true }))
 app.use(express.json())
 app.use(express.text())
+
+// Auth: mount /api/auth routes first, then gate all other /api/* routes
+const auth = createAuth({ vaultDir: VAULT_DIR })
+app.use('/api/auth', auth.router)
+app.use('/api', auth.middleware)
 
 // Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
 app.get('/api/config', (req, res) => {
