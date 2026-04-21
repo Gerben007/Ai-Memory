@@ -55,11 +55,12 @@ const INTERNAL_BYPASS = crypto.randomBytes(32).toString('hex')
 
 // Auth: login screen (cookie-based) + bearer token middleware
 const auth = createAuth({ vaultDir: VAULT_DIR })
+const bearerAuth = createAuthMiddleware()
 app.use('/api/auth', auth.router)
 app.get('/api/auth/status', authStatusHandler)
 app.use('/api', (req, res, next) => {
   if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
-  createAuthMiddleware()(req, res, next)
+  bearerAuth(req, res, next)
 })
 app.use('/api', (req, res, next) => {
   if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
