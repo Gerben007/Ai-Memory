@@ -41,11 +41,12 @@ export function createEmailPoller(vaultDir, configPath) {
     })
     try {
       await client.connect()
-      const lock = await client.getMailboxLock('INBOX')
+      const folder = cfg.folder || 'INBOX'
+      const lock = await client.getMailboxLock(folder)
       const count = client.mailbox.exists
       lock.release()
       await client.logout()
-      return { success: true, messageCount: count }
+      return { success: true, messageCount: count, folder }
     } catch (err) {
       try { await client.logout() } catch {}
       return { success: false, error: err.message }
@@ -87,7 +88,8 @@ export function createEmailPoller(vaultDir, configPath) {
 
     try {
       await client.connect()
-      const lock = await client.getMailboxLock('INBOX')
+      const folder = cfg.folder || 'INBOX'
+      const lock = await client.getMailboxLock(folder)
 
       try {
         const searchCriteria = state.lastUid > 0 ? { uid: `${state.lastUid + 1}:*` } : { all: true }

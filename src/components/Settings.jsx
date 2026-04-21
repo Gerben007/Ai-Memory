@@ -31,7 +31,7 @@ export default function Settings() {
   const [tokenStatus, setTokenStatus] = useState('')
 
   // Email ingestion state
-  const [emailCfg, setEmailCfg] = useState({ enabled: false, host: 'imap.gmail.com', port: 993, secure: true, user: '', pass: '', pollInterval: 5 })
+  const [emailCfg, setEmailCfg] = useState({ enabled: false, host: 'imap.gmail.com', port: 993, secure: true, user: '', pass: '', folder: 'Vault', pollInterval: 5 })
   const [emailStatus, setEmailStatus] = useState(null)
   const [emailMsg, setEmailMsg] = useState('')
   const [emailTesting, setEmailTesting] = useState(false)
@@ -438,6 +438,21 @@ export default function Settings() {
                   {showEmailPass ? 'Hide' : 'Show'}
                 </button>
               </div>
+            </div>
+
+            {/* Gmail label / IMAP folder */}
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-1">Gmail label / IMAP folder</label>
+              <input
+                type="text"
+                value={emailCfg.folder}
+                onChange={e => setEmailCfg(prev => ({ ...prev, folder: e.target.value }))}
+                placeholder="Vault"
+                className="w-full bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
+              />
+              <p className="text-[9px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                Only emails with this Gmail label will be processed. Use "INBOX" for all emails.
+              </p>
             </div>
 
             {/* Poll interval */}
