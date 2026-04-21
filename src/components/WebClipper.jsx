@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../lib/store'
+import { authHeader, getVaultToken } from '../lib/api'
 
 export default function WebClipper() {
   const loadNotes = useStore(s => s.loadNotes)
@@ -8,14 +9,20 @@ export default function WebClipper() {
   const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002'
   const [vaultUrl, setVaultUrl] = useState(defaultUrl)
 
-  // The bookmarklet code — uses the configured vault URL
-  const bookmarkletCode = `javascript:void(function(){var s=window.getSelection().toString().trim();var t=document.title;var u=window.location.href;if(!s){s=document.querySelector('article,main,.post-content,[role=main]');s=s?s.innerText.slice(0,5000):document.body.innerText.slice(0,2000)}fetch('${vaultUrl}/api/clip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:t.slice(0,100),content:s.slice(0,5000),url:u,tags:['clip']})}).then(r=>r.json()).then(d=>{if(d.filename)alert('Clipped to Knowledge Vault: '+d.title);else alert('Clip failed: '+(d.error||'unknown'))}).catch(e=>alert('Clip failed: '+e.message))}())`
+  // The bookmarklet code — uses the configured vault URL. The access token is
+  // baked into the bookmarklet so the bookmarklet can authenticate from an
+  // arbitrary site's origin. Warn the user if no token is configured (means
+  // the server allows unauthenticated clips — generally only acceptable for
+  // local-only setups).
+  const token = getVaultToken()
+  const authLine = token ? `,'Authorization':'Bearer ${token.replace(/'/g, "\\'")}'` : ''
+  const bookmarkletCode = `javascript:void(function(){var s=window.getSelection().toString().trim();var t=document.title;var u=window.location.href;if(!s){s=document.querySelector('article,main,.post-content,[role=main]');s=s?s.innerText.slice(0,5000):document.body.innerText.slice(0,2000)}fetch('${vaultUrl}/api/clip',{method:'POST',headers:{'Content-Type':'application/json'${authLine}},body:JSON.stringify({title:t.slice(0,100),content:s.slice(0,5000),url:u,tags:['clip']})}).then(r=>r.json()).then(d=>{if(d.filename)alert('Clipped to Knowledge Vault: '+d.title);else alert('Clip failed: '+(d.error||'unknown'))}).catch(e=>alert('Clip failed: '+e.message))}())`
 
   const handleTest = async () => {
     try {
       const res = await fetch('/api/clip', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           title: 'Test Clip — ' + new Date().toLocaleTimeString(),
           content: 'This is a test clip from the Knowledge Vault web clipper. If you see this note, the clipper is working correctly!',

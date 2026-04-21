@@ -1,13 +1,67 @@
 const API_BASE = '/api'
+const VAULT_TOKEN_STORAGE_KEY = 'kv-vault-token'
+
+// 401 handler installed by the app shell — lets the UI show an auth gate.
+let on401Handler = null
+export function setOn401Handler(fn) { on401Handler = fn }
+
+export function getVaultToken() {
+  try { return localStorage.getItem(VAULT_TOKEN_STORAGE_KEY) || '' } catch { return '' }
+}
+
+export function setVaultToken(token) {
+  try {
+    if (token) localStorage.setItem(VAULT_TOKEN_STORAGE_KEY, token)
+    else localStorage.removeItem(VAULT_TOKEN_STORAGE_KEY)
+  } catch {}
+}
+
+// Public helper for components that build their own fetch() calls (e.g.
+// FormData uploads). Returns `{ Authorization: 'Bearer ...' }` or `{}`.
+export function authHeader() {
+  const token = getVaultToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+function withAuth(init = {}) {
+  const token = getVaultToken()
+  if (!token) return init
+  const headers = new Headers(init.headers || {})
+  if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+  return { ...init, headers }
+}
+
+async function authFetch(input, init) {
+  const res = await fetch(input, withAuth(init))
+  if (res.status === 401 && on401Handler) {
+    try {
+      const body = await res.clone().json()
+      if (body?.authRequired) on401Handler()
+    } catch {
+      on401Handler()
+    }
+  }
+  return res
+}
+
+export async function fetchAuthStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/auth/status`)
+    if (!res.ok) return { authRequired: false }
+    return res.json()
+  } catch {
+    return { authRequired: false }
+  }
+}
 
 export async function loadConfig() {
-  const res = await fetch(`${API_BASE}/config`)
+  const res = await authFetch(`${API_BASE}/config`)
   if (!res.ok) return {}
   return res.json()
 }
 
 export async function saveConfig(updates) {
-  await fetch(`${API_BASE}/config`, {
+  await authFetch(`${API_BASE}/config`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates)
@@ -15,19 +69,19 @@ export async function saveConfig(updates) {
 }
 
 export async function fetchNotes() {
-  const res = await fetch(`${API_BASE}/notes`)
+  const res = await authFetch(`${API_BASE}/notes`)
   if (!res.ok) throw new Error('Failed to fetch notes')
   return res.json()
 }
 
 export async function fetchNote(filename) {
-  const res = await fetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`)
+  const res = await authFetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`)
   if (!res.ok) throw new Error('Failed to fetch note')
   return res.json()
 }
 
 export async function saveNote(filename, content) {
-  const res = await fetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`, {
+  const res = await authFetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: content
@@ -41,7 +95,7 @@ export async function saveNote(filename, content) {
 }
 
 export async function deleteNote(filename) {
-  const res = await fetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`, {
+  const res = await authFetch(`${API_BASE}/notes/${encodeURIComponent(filename)}`, {
     method: 'DELETE'
   })
   if (!res.ok) throw new Error('Failed to delete note')
@@ -49,7 +103,7 @@ export async function deleteNote(filename) {
 }
 
 export async function loadContext() {
-  const res = await fetch(`${API_BASE}/context`)
+  const res = await authFetch(`${API_BASE}/context`)
   if (!res.ok) return { content: '' }
   return res.json()
 }
@@ -81,7 +135,7 @@ ${noteSummaries}
 
 Write ONLY the markdown profile. Be concise but thorough.`
 
-  const res = await fetch(`${API_BASE}/chat`, {
+  const res = await authFetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -109,7 +163,7 @@ Write ONLY the markdown profile. Be concise but thorough.`
   const content = data.content?.[0]?.text || ''
 
   // Save to server
-  await fetch(`${API_BASE}/context`, {
+  await authFetch(`${API_BASE}/context`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content })
@@ -153,7 +207,7 @@ export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
       await new Promise(r => setTimeout(r, 2000 * attempt))
     }
 
-    const res = await fetch(`${API_BASE}/chat`, {
+    const res = await authFetch(`${API_BASE}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

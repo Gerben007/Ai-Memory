@@ -1,6 +1,16 @@
 import { Marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 const wikilinkExtension = {
   name: 'wikilink',
@@ -24,7 +34,7 @@ const wikilinkExtension = {
     }
   },
   renderer(token) {
-    return `<a class="wikilink" data-wikilink="${token.target}" href="#">${token.display}</a>`
+    return `<a class="wikilink" data-wikilink="${escapeHtml(token.target)}" href="#">${escapeHtml(token.display)}</a>`
   }
 }
 
@@ -46,7 +56,15 @@ marked.use({
   breaks: false
 })
 
+// Preserve wikilink marker attribute; DOMPurify strips unknown data-* attrs by default only
+// when ALLOW_DATA_ATTR is false. It's true by default, but we list it explicitly to document intent.
+const SANITIZE_CONFIG = {
+  ALLOW_DATA_ATTR: true,
+  ADD_ATTR: ['data-wikilink']
+}
+
 export function renderMarkdown(text) {
   if (!text) return ''
-  return marked.parse(text)
+  const html = marked.parse(text)
+  return DOMPurify.sanitize(html, SANITIZE_CONFIG)
 }

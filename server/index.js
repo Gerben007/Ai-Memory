@@ -8,6 +8,7 @@ import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
 import { createEmailPoller } from './emailPoller.js'
 import { createAuth } from './auth.js'
+import { createAuthMiddleware, authStatusHandler } from './authMiddleware.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -30,16 +31,28 @@ if (!fs.existsSync(VAULT_DIR)) {
   fs.mkdirSync(VAULT_DIR, { recursive: true })
 }
 
-// Trust first proxy hop (cloudflared / reverse proxy) so req.secure + req.ip work
 app.set('trust proxy', 1)
 
-app.use(cors({ origin: true, credentials: true }))
+const allowedOrigins = (process.env.VAULT_ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean)
+const allowAllOrigins = allowedOrigins.includes('*')
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true)
+    if (allowAllOrigins) return cb(null, true)
+    if (allowedOrigins.includes(origin)) return cb(null, true)
+    return cb(null, false)
+  },
+  credentials: true
+}))
 app.use(express.json())
 app.use(express.text())
 
-// Auth: mount /api/auth routes first, then gate all other /api/* routes
+// Auth: login screen (cookie-based) + bearer token middleware
 const auth = createAuth({ vaultDir: VAULT_DIR })
 app.use('/api/auth', auth.router)
+app.get('/api/auth/status', authStatusHandler)
+app.use('/api', createAuthMiddleware())
 app.use('/api', auth.middleware)
 
 // Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
@@ -97,6 +110,24 @@ app.post('/api/context', (req, res) => {
   }
 })
 
+// Escape a value for use inside a YAML double-quoted scalar. Prevents frontmatter
+// injection when the value contains quotes, backslashes, or newlines.
+function yamlQuote(value) {
+  const s = String(value ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+  return `"${escaped}"`
+}
+
+// Keep tag values to a safe shape so we never break out of the YAML list.
+function sanitizeTag(tag) {
+  return String(tag ?? '').replace(/[^A-Za-z0-9/_-]/g, '').slice(0, 64)
+}
+
 // Web clipper — POST /api/clip to capture content from bookmarklet/extension
 app.post('/api/clip', (req, res) => {
   try {
@@ -109,9 +140,10 @@ app.post('/api/clip', (req, res) => {
     const filePath = path.join(VAULT_DIR, filename)
     if (fs.existsSync(filePath)) filename = `clip-${slug}-${Date.now().toString(36)}.md`
 
-    const tagStr = (tags || ['clip']).join(', ')
-    const urlLine = url ? `source: "${url}"\n` : ''
-    const noteContent = `---\ntitle: "${title.replace(/"/g, '\\"')}"\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
+    const safeTags = (Array.isArray(tags) && tags.length ? tags : ['clip']).map(sanitizeTag).filter(Boolean)
+    const tagStr = safeTags.join(', ')
+    const urlLine = url ? `source: ${yamlQuote(url)}\n` : ''
+    const noteContent = `---\ntitle: ${yamlQuote(title)}\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
 
     fs.writeFileSync(path.join(VAULT_DIR, filename), noteContent, 'utf-8')
     res.json({ filename, title })
