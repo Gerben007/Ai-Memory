@@ -19,13 +19,13 @@ function timingSafeEqualStr(a, b) {
   return diff === 0
 }
 
-function buildMcpServer(vaultBaseUrl) {
+function buildMcpServer(vaultBaseUrl, extraHeaders = {}) {
   const server = new McpServer({ name: 'knowledge-vault', version: '1.0.0' })
 
   async function vaultFetchJson(path, options = {}) {
     const res = await fetch(`${vaultBaseUrl}${path}`, {
       ...options,
-      headers: { 'Content-Type': options.body ? 'application/json' : undefined, ...options.headers }
+      headers: { 'Content-Type': options.body ? 'application/json' : undefined, ...extraHeaders, ...options.headers }
     })
     if (!res.ok) throw new Error(`Vault API error (${res.status}): ${await res.text().catch(() => res.statusText)}`)
     return res.json()
@@ -34,7 +34,7 @@ function buildMcpServer(vaultBaseUrl) {
   async function vaultFetchText(path, options = {}) {
     const res = await fetch(`${vaultBaseUrl}${path}`, {
       ...options,
-      headers: { 'Content-Type': 'text/plain', ...options.headers }
+      headers: { 'Content-Type': 'text/plain', ...extraHeaders, ...options.headers }
     })
     if (!res.ok) throw new Error(`Vault API error (${res.status}): ${await res.text().catch(() => res.statusText)}`)
     return res.json()
@@ -219,7 +219,7 @@ function buildMcpServer(vaultBaseUrl) {
   return server
 }
 
-export function createMcpRoutes({ vaultBaseUrl, bearerToken }) {
+export function createMcpRoutes({ vaultBaseUrl, bearerToken, internalAuthBypass }) {
   if (!bearerToken) {
     console.warn('[MCP] MCP_BEARER_TOKEN is not set — /mcp endpoint is DISABLED')
   }
@@ -231,9 +231,6 @@ export function createMcpRoutes({ vaultBaseUrl, bearerToken }) {
     const header = req.get('authorization') || ''
     const prefix = 'Bearer '
     const headerOk = header.startsWith(prefix) && timingSafeEqualStr(header.slice(prefix.length), bearerToken)
-    // Fallback: accept token as ?token=... query param. claude.ai's custom connector UI
-    // couples its "client secret" field to an OAuth client ID, so plain bearer auth via
-    // Advanced settings fails validation. Embedding the token in the URL sidesteps that.
     const queryToken = typeof req.query.token === 'string' ? req.query.token : ''
     const queryOk = queryToken.length > 0 && timingSafeEqualStr(queryToken, bearerToken)
     if (!headerOk && !queryOk) {
@@ -243,9 +240,15 @@ export function createMcpRoutes({ vaultBaseUrl, bearerToken }) {
     next()
   })
 
+  function buildInternalServer() {
+    const headers = {}
+    if (internalAuthBypass) headers['X-Internal-Bypass'] = internalAuthBypass
+    return buildMcpServer(vaultBaseUrl, headers)
+  }
+
   router.post('/', async (req, res) => {
     try {
-      const server = buildMcpServer(vaultBaseUrl)
+      const server = buildInternalServer()
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
       res.on('close', () => { transport.close(); server.close() })
       await server.connect(transport)

@@ -6,6 +6,7 @@ import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
+import crypto from 'crypto'
 import { createEmailPoller } from './emailPoller.js'
 import { createAuth } from './auth.js'
 import { createAuthMiddleware, authStatusHandler } from './authMiddleware.js'
@@ -49,12 +50,21 @@ app.use(cors({
 app.use(express.json())
 app.use(express.text())
 
+// Internal bypass secret — lets MCP routes call /api/* without auth
+const INTERNAL_BYPASS = crypto.randomBytes(32).toString('hex')
+
 // Auth: login screen (cookie-based) + bearer token middleware
 const auth = createAuth({ vaultDir: VAULT_DIR })
 app.use('/api/auth', auth.router)
 app.get('/api/auth/status', authStatusHandler)
-app.use('/api', createAuthMiddleware())
-app.use('/api', auth.middleware)
+app.use('/api', (req, res, next) => {
+  if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
+  createAuthMiddleware()(req, res, next)
+})
+app.use('/api', (req, res, next) => {
+  if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
+  auth.middleware(req, res, next)
+})
 
 // Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
 app.get('/api/config', (req, res) => {
@@ -192,7 +202,8 @@ app.post('/api/config/email-restart', (req, res) => {
 // Remote MCP endpoint (Streamable HTTP, bearer-guarded)
 app.use('/mcp', createMcpRoutes({
   vaultBaseUrl: `http://127.0.0.1:${PORT}`,
-  bearerToken: process.env.MCP_BEARER_TOKEN || ''
+  bearerToken: process.env.MCP_BEARER_TOKEN || '',
+  internalAuthBypass: INTERNAL_BYPASS
 }))
 
 // In production, serve the built frontend
