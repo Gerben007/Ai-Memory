@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily auto-commit of /mnt/vault
+After=network-online.target mnt-vault.mount
+Requires=mnt-vault.mount
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vault-autocommit.sh

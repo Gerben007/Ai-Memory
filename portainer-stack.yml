@@ -1,10 +1,18 @@
-# Portainer Web Editor stack — paste this into Portainer > Stacks > Add Stack > Web editor
-# Prerequisites: SSH into your homelab first and build the image:
+# Portainer Web Editor stack — paste this into Portainer > Stacks > ai-memory > Editor
+#
+# Prerequisites on the Core Services VM:
+#   1. NFS mount /mnt/vault is up (see fstab entry)
+#   2. Git is initialised in /mnt/vault (deploy/vault/01-git-init.sh)
+#   3. Auto-commit timer installed (deploy/vault/02-install-autocommit.sh)
+#
+# Build the image once on the VM:
 #   git clone git@github.com:Gerben007/Ai-Memory.git
 #   cd Ai-Memory
 #   docker build -t knowledge-vault:latest .
 #
-# Then paste this stack definition in Portainer.
+# The old named volume `ai-knowledge_vault-data` is intentionally NOT removed
+# from Docker — it stays around so we can migrate its contents into /mnt/vault
+# in a separate session. Do not `docker volume rm` it.
 
 services:
   knowledge-vault:
@@ -14,12 +22,11 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - vault-data:/data/vault
+      # Bind-mount the TrueNAS-backed NFS vault directly into the container.
+      # Source of truth lives on TrueNAS dataset tank/vault; Git history and
+      # Syncthing replication are handled on the host, not inside this container.
+      - /mnt/vault:/data/vault
     environment:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
-
-volumes:
-  vault-data:
-    driver: local
