@@ -89,12 +89,13 @@ echo "   OK: $ST_USER has write access"
 echo "==> Enabling syncthing@$ST_USER.service"
 sudo systemctl enable --now "syncthing@$ST_USER.service"
 
-# Wait for config.xml to appear (Syncthing 1.27+ uses XDG paths)
+# Wait for config.xml to appear (Syncthing 1.27+ uses XDG paths).
+# The syncthing user's home is typically 0700, so we must stat as root.
 CFG=""
 for _ in $(seq 1 20); do
-    if   [[ -f "$ST_HOME/.local/state/syncthing/config.xml" ]]; then
+    if   sudo test -f "$ST_HOME/.local/state/syncthing/config.xml"; then
         CFG="$ST_HOME/.local/state/syncthing/config.xml"; break
-    elif [[ -f "$ST_HOME/.config/syncthing/config.xml" ]]; then
+    elif sudo test -f "$ST_HOME/.config/syncthing/config.xml"; then
         CFG="$ST_HOME/.config/syncthing/config.xml"; break
     fi
     sleep 1
@@ -189,7 +190,8 @@ sudo systemctl start "syncthing@$ST_USER.service"
 
 # Wait for it to come up and emit a device ID
 for _ in $(seq 1 20); do
-    DEVICE_ID=$(sudo -u "$ST_USER" syncthing --device-id 2>/dev/null || true)
+    # -H sets HOME=/var/lib/syncthing so syncthing finds its cert.pem
+    DEVICE_ID=$(sudo -Hu "$ST_USER" syncthing --device-id 2>/dev/null || true)
     [[ -n "$DEVICE_ID" ]] && break
     sleep 1
 done
