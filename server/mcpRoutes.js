@@ -230,7 +230,13 @@ export function createMcpRoutes({ vaultBaseUrl, bearerToken }) {
     if (!bearerToken) return res.status(503).json({ error: 'MCP disabled: MCP_BEARER_TOKEN not configured' })
     const header = req.get('authorization') || ''
     const prefix = 'Bearer '
-    if (!header.startsWith(prefix) || !timingSafeEqualStr(header.slice(prefix.length), bearerToken)) {
+    const headerOk = header.startsWith(prefix) && timingSafeEqualStr(header.slice(prefix.length), bearerToken)
+    // Fallback: accept token as ?token=... query param. claude.ai's custom connector UI
+    // couples its "client secret" field to an OAuth client ID, so plain bearer auth via
+    // Advanced settings fails validation. Embedding the token in the URL sidesteps that.
+    const queryToken = typeof req.query.token === 'string' ? req.query.token : ''
+    const queryOk = queryToken.length > 0 && timingSafeEqualStr(queryToken, bearerToken)
+    if (!headerOk && !queryOk) {
       res.set('WWW-Authenticate', 'Bearer realm="knowledge-vault"')
       return res.status(401).json({ error: 'Unauthorized' })
     }
