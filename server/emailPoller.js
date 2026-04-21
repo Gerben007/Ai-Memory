@@ -144,15 +144,18 @@ export function createEmailPoller(vaultDir, configPath) {
     const subject = parsed.subject || 'No Subject'
     const from = parsed.from?.text || ''
     const to = parsed.to?.text || ''
+    const cc = parsed.cc?.text || ''
     const date = parsed.date?.toISOString() || ''
+    const messageId = parsed.messageId || ''
     const body = parsed.text || parsed.html?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') || ''
+    const meta = { from, to, cc, date, subject, messageId }
 
     if (!body.trim() || body.trim().length < 20) {
       return { skip: true, reason: 'Empty or too short' }
     }
 
     if (!apiKey) {
-      return saveRawEmail(subject, from, date, body)
+      return saveRawEmail(meta, body)
     }
 
     try {
@@ -183,32 +186,36 @@ Return ONLY valid JSON:
 or { "skip": true, "reason": "..." }`,
           messages: [{
             role: 'user',
-            content: `From: ${from}\nTo: ${to}\nDate: ${date}\nSubject: ${subject}\n\n${body.slice(0, 6000)}`
+            content: `From: ${from}\nTo: ${to}\nCC: ${cc}\nDate: ${date}\nSubject: ${subject}\n\n${body.slice(0, 6000)}`
           }]
         })
       })
 
       if (!response.ok) {
         console.error(`[Email] AI error ${response.status}`)
-        return saveRawEmail(subject, from, date, body)
+        return saveRawEmail(meta, body)
       }
 
       const data = await response.json()
       const text = data.content?.[0]?.text || ''
       const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) return saveRawEmail(subject, from, date, body)
+      if (!jsonMatch) return saveRawEmail(meta, body)
 
       const result = JSON.parse(jsonMatch[0])
       if (result.skip) return { skip: true, reason: result.reason || 'AI skipped' }
 
-      return saveNote(result.title || subject, result.tags || [], result.content || body, from, date)
+      return saveNote(result.title || subject, result.tags || [], result.content || body, meta)
     } catch (err) {
       console.error('[Email] AI processing failed:', err.message)
-      return saveRawEmail(subject, from, date, body)
+      return saveRawEmail(meta, body)
     }
   }
 
-  function saveNote(title, tags, content, emailFrom, emailDate) {
+  function yamlEscape(s) {
+    return String(s || '').replace(/"/g, '\\"').replace(/\n/g, ' ').replace(/\r/g, '')
+  }
+
+  function saveNote(title, tags, content, meta = {}) {
     const now = new Date().toISOString()
     const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
     let filename = `email-${slug}.md`
@@ -219,27 +226,40 @@ or { "skip": true, "reason": "..." }`,
     const tagStr = tags.map(t => t.includes(',') ? `"${t}"` : t).join(', ')
     const frontmatter = [
       '---',
-      `title: "${title.replace(/"/g, '\\"')}"`,
+      `title: "${yamlEscape(title)}"`,
       `tags: [${tagStr}]`,
       `created: ${now}`,
       `updated: ${now}`,
       `source: email`,
-      emailFrom ? `email_from: "${emailFrom.replace(/"/g, '\\"')}"` : null,
-      emailDate ? `email_date: ${emailDate}` : null,
+      meta.from ? `email_from: "${yamlEscape(meta.from)}"` : null,
+      meta.to ? `email_to: "${yamlEscape(meta.to)}"` : null,
+      meta.cc ? `email_cc: "${yamlEscape(meta.cc)}"` : null,
+      meta.date ? `email_date: ${meta.date}` : null,
+      meta.subject ? `email_subject: "${yamlEscape(meta.subject)}"` : null,
+      meta.messageId ? `email_message_id: "${yamlEscape(meta.messageId)}"` : null,
       '---'
     ].filter(Boolean).join('\n')
 
-    fs.writeFileSync(path.join(vaultDir, filename), `${frontmatter}\n\n${content}\n`, 'utf-8')
+    const emailHeader = [
+      '> **Email received**',
+      meta.from ? `> **From:** ${meta.from}` : null,
+      meta.to ? `> **To:** ${meta.to}` : null,
+      meta.cc ? `> **CC:** ${meta.cc}` : null,
+      meta.date ? `> **Date:** ${new Date(meta.date).toLocaleString()}` : null,
+      meta.subject ? `> **Subject:** ${meta.subject}` : null
+    ].filter(Boolean).join('\n')
+
+    const fullContent = `${frontmatter}\n\n${emailHeader}\n\n---\n\n${content}\n`
+    fs.writeFileSync(path.join(vaultDir, filename), fullContent, 'utf-8')
     return { skip: false, filename }
   }
 
-  function saveRawEmail(subject, from, date, body) {
+  function saveRawEmail(meta, body) {
     return saveNote(
-      subject,
+      meta.subject || 'Untitled Email',
       ['email/unprocessed'],
-      `**From:** ${from}\n**Date:** ${date}\n\n---\n\n${body.slice(0, 4000)}`,
-      from,
-      date
+      body.slice(0, 4000),
+      meta
     )
   }
 
