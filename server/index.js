@@ -183,6 +183,32 @@ app.get('/api/attachments-list', (req, res) => {
   }
 })
 
+// Read attachment content as base64 (for MCP tool access)
+app.get('/api/attachment-content/:filename', (req, res) => {
+  const filename = req.params.filename
+  if (!filename || filename.includes('..') || filename.includes('/')) {
+    return res.status(400).json({ error: 'Invalid filename' })
+  }
+  const filePath = path.join(ATTACHMENTS_DIR, filename)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Attachment not found' })
+  try {
+    const stat = fs.statSync(filePath)
+    const ext = path.extname(filename).toLowerCase()
+    const isText = ['.txt', '.md', '.json', '.xml', '.csv', '.html', '.htm'].includes(ext)
+    if (isText) {
+      const text = fs.readFileSync(filePath, 'utf-8')
+      return res.json({ name: filename, size: stat.size, type: 'text', content: text.slice(0, 50000) })
+    }
+    const buffer = fs.readFileSync(filePath)
+    const base64 = buffer.toString('base64')
+    const mimeTypes = { '.pdf': 'application/pdf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+    const mime = mimeTypes[ext] || 'application/octet-stream'
+    res.json({ name: filename, size: stat.size, type: mime, base64 })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // API routes
 app.use('/api/notes', createFileRoutes(VAULT_DIR))
 app.use('/api/chat', createAnthropicProxy())

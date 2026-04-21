@@ -229,13 +229,28 @@ function buildMcpServer(vaultBaseUrl, extraHeaders = {}) {
   )
 
   server.tool(
-    'vault_get_attachment_url',
-    'Get the download URL for a vault attachment. Use vault_list_attachments to see available files.',
+    'vault_read_attachment',
+    'Read an attachment file from the vault. Returns text content for text files, or base64-encoded data for images/PDFs. Use vault_list_attachments to see available files.',
     { filename: z.string().describe('Attachment filename (e.g. "fw-dam-sealing-referral-ernst-koen-Invoice_INV-0003691.pdf")') },
     async ({ filename }) => {
-      const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '')
-      const url = `${vaultBaseUrl}/api/attachments/${encodeURIComponent(safe)}`
-      return { content: [{ type: 'text', text: `Attachment URL: ${url}\n\nNote: This is the internal server URL. The public URL depends on your tunnel/domain configuration.` }] }
+      const data = await vaultFetchJson(`/api/attachment-content/${encodeURIComponent(filename)}`)
+      if (data.type === 'text') {
+        return { content: [{ type: 'text', text: `File: ${data.name} (${(data.size / 1024).toFixed(1)} KB)\n\n${data.content}` }] }
+      }
+      if (data.type?.startsWith('image/')) {
+        return {
+          content: [
+            { type: 'text', text: `Image: ${data.name} (${(data.size / 1024).toFixed(1)} KB)` },
+            { type: 'image', data: data.base64, mimeType: data.type }
+          ]
+        }
+      }
+      return {
+        content: [{
+          type: 'text',
+          text: `File: ${data.name} (${(data.size / 1024).toFixed(1)} KB, ${data.type})\n\nBinary file — base64 data available (${data.base64?.length || 0} chars). For PDFs, the content was extracted during email processing and included in the associated note.`
+        }]
+      }
     }
   )
 
