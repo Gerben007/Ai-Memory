@@ -1,13 +1,13 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
+import { execFileSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
-let _PDFParse, _XLSX, _mammoth
+let _XLSX, _mammoth
 async function loadParser(name) {
   try {
     switch (name) {
-      case 'pdf':     if (!_PDFParse) _PDFParse = (await import('pdf-parse')).PDFParse;    return _PDFParse
       case 'xlsx':    if (!_XLSX)     _XLSX     = (await import('xlsx')).default;           return _XLSX
       case 'mammoth': if (!_mammoth)  _mammoth  = (await import('mammoth')).default;        return _mammoth
     }
@@ -15,31 +15,49 @@ async function loadParser(name) {
   return null
 }
 
+// PDF extraction runs in a subprocess to prevent segfaults from crashing the server
+function extractPdfInSubprocess(pdfPath, timeout = 30000) {
+  const script = `
+    import('pdf-parse').then(async m => {
+      const parser = new m.PDFParse({});
+      await parser.load(process.argv[1]);
+      const info = await parser.getInfo().catch(() => ({}));
+      const pages = [];
+      for (let i = 1; i <= (info?.Pages || 1); i++) {
+        try { const t = await parser.getPageText(i); if (t?.trim()) pages.push(t.trim()); } catch {}
+      }
+      if (!pages.length) { try { const t = await parser.getText(); if (t?.trim()) pages.push(t.trim()); } catch {} }
+      parser.destroy();
+      process.stdout.write(JSON.stringify({ text: pages.join('\\n\\n') }));
+    }).catch(e => { process.stdout.write(JSON.stringify({ error: e.message })); });
+  `
+  try {
+    const result = execFileSync('node', ['--input-type=module', '-e', script, pdfPath], {
+      timeout,
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    const parsed = JSON.parse(result.toString())
+    if (parsed.error) { console.warn(`[Email] PDF subprocess error: ${parsed.error}`); return null }
+    return parsed.text || null
+  } catch (err) {
+    console.warn(`[Email] PDF extraction subprocess failed: ${err.message}`)
+    return null
+  }
+}
+
 async function extractAttachmentText(buffer, filename) {
   const ext = path.extname(filename).toLowerCase()
   try {
     if (ext === '.pdf') {
-      const PDFParse = await loadParser('pdf')
-      if (!PDFParse) return null
       const tmpPath = `/tmp/att-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`
       fs.writeFileSync(tmpPath, buffer)
-      const parser = new PDFParse({})
-      await parser.load(tmpPath)
-      const info = await parser.getInfo().catch(() => ({}))
-      const numPages = info?.Pages || 1
-      const pages = []
-      for (let i = 1; i <= numPages; i++) {
-        try {
-          const t = await parser.getPageText(i)
-          if (t?.trim()) pages.push(t.trim())
-        } catch {}
+      try {
+        const text = extractPdfInSubprocess(tmpPath)
+        return text
+      } finally {
+        try { fs.unlinkSync(tmpPath) } catch {}
       }
-      if (!pages.length) {
-        try { const t = await parser.getText(); if (t?.trim()) pages.push(t.trim()) } catch {}
-      }
-      parser.destroy()
-      fs.unlinkSync(tmpPath)
-      return pages.join('\n\n') || null
     }
     if (ext === '.docx') {
       const mammoth = await loadParser('mammoth')
@@ -168,6 +186,10 @@ export function createEmailPoller(vaultDir, configPath) {
           if (msg.uid <= state.lastUid) continue
           uids.push(msg.uid)
 
+          // Save UID immediately so a crash won't re-process this email
+          state.lastUid = Math.max(state.lastUid, msg.uid)
+          saveState(state)
+
           try {
             const parsed = await simpleParser(msg.source)
             const result = await processEmail(parsed, apiKey, model)
@@ -182,8 +204,6 @@ export function createEmailPoller(vaultDir, configPath) {
           } catch (err) {
             console.error(`[Email] Failed to process UID ${msg.uid}:`, err.message)
           }
-
-          state.lastUid = Math.max(state.lastUid, msg.uid)
         }
       } finally {
         lock.release()
