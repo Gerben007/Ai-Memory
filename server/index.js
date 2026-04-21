@@ -1,0 +1,131 @@
+import express from 'express'
+import cors from 'cors'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import fs from 'fs'
+import { createFileRoutes } from './fileRoutes.js'
+import { createAnthropicProxy } from './anthropicProxy.js'
+import { createSearchRoutes } from './searchRoutes.js'
+// Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
+let createImportRoutes = null
+try {
+  const mod = await import('./importRoutes.js')
+  createImportRoutes = mod.createImportRoutes
+} catch (err) {
+  console.warn('[Import] File import disabled — native dependency error:', err.message)
+}
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const app = express()
+const PORT = process.env.PORT || 3001
+const HOST = process.env.HOST || '0.0.0.0'
+const VAULT_DIR = process.env.VAULT_DIR || path.join(__dirname, '..', 'vault')
+const CONFIG_PATH = path.join(VAULT_DIR, '.vault-config.json')
+const CONTEXT_PATH = path.join(VAULT_DIR, '.vault-context.md')
+
+// Ensure vault directory exists
+if (!fs.existsSync(VAULT_DIR)) {
+  fs.mkdirSync(VAULT_DIR, { recursive: true })
+}
+
+app.use(cors())
+app.use(express.json())
+app.use(express.text())
+
+// Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
+app.get('/api/config', (req, res) => {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+      res.json(config)
+    } else {
+      res.json({})
+    }
+  } catch {
+    res.json({})
+  }
+})
+
+app.post('/api/config', (req, res) => {
+  try {
+    let existing = {}
+    if (fs.existsSync(CONFIG_PATH)) {
+      existing = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
+    }
+    const updated = { ...existing, ...req.body }
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8')
+    res.json({ saved: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Vault context endpoints — persistent vault profile at .vault-context.md
+app.get('/api/context', (req, res) => {
+  try {
+    if (fs.existsSync(CONTEXT_PATH)) {
+      const content = fs.readFileSync(CONTEXT_PATH, 'utf-8')
+      res.json({ content })
+    } else {
+      res.json({ content: '' })
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/context', (req, res) => {
+  try {
+    const { content } = req.body
+    if (typeof content !== 'string') {
+      return res.status(400).json({ error: 'content must be a string' })
+    }
+    fs.writeFileSync(CONTEXT_PATH, content, 'utf-8')
+    res.json({ saved: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Web clipper — POST /api/clip to capture content from bookmarklet/extension
+app.post('/api/clip', (req, res) => {
+  try {
+    const { title, content, url, tags } = req.body
+    if (!title || !content) return res.status(400).json({ error: 'title and content required' })
+
+    const now = new Date().toISOString()
+    const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80)
+    let filename = `clip-${slug}.md`
+    const filePath = path.join(VAULT_DIR, filename)
+    if (fs.existsSync(filePath)) filename = `clip-${slug}-${Date.now().toString(36)}.md`
+
+    const tagStr = (tags || ['clip']).join(', ')
+    const urlLine = url ? `source: "${url}"\n` : ''
+    const noteContent = `---\ntitle: "${title.replace(/"/g, '\\"')}"\ntags: [${tagStr}]\ncreated: ${now}\nupdated: ${now}\n${urlLine}---\n\n${content}\n`
+
+    fs.writeFileSync(path.join(VAULT_DIR, filename), noteContent, 'utf-8')
+    res.json({ filename, title })
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
+// API routes
+app.use('/api/notes', createFileRoutes(VAULT_DIR))
+app.use('/api/chat', createAnthropicProxy())
+app.use('/api', createSearchRoutes(VAULT_DIR))
+if (createImportRoutes) {
+  app.use('/api/import', createImportRoutes(VAULT_DIR))
+}
+
+// In production, serve the built frontend
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'dist')
+  app.use(express.static(distPath))
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
+
+app.listen(PORT, HOST, () => {
+  console.log(`Knowledge Vault server running on http://${HOST}:${PORT}`)
+  console.log(`Vault directory: ${VAULT_DIR}`)
+})

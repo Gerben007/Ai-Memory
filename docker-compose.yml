@@ -1,0 +1,40 @@
+services:
+  knowledge-vault:
+    image: knowledge-vault:latest
+    build: .
+    container_name: knowledge-vault
+    restart: unless-stopped
+    ports:
+      - "3002:3001"
+    volumes:
+      - vault-data:/data/vault
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - VAULT_DIR=/data/vault
+
+  # Cloudflare Tunnel — exposes vault externally via your domain
+  # To set up:
+  #   1. Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/
+  #   2. Run: cloudflared tunnel login
+  #   3. Run: cloudflared tunnel create knowledge-vault
+  #   4. Copy the tunnel token
+  #   5. Set CLOUDFLARE_TUNNEL_TOKEN in .env or replace below
+  #   6. In Cloudflare Zero Trust dashboard, add a public hostname
+  #      pointing to your tunnel (e.g. vault.yourdomain.com → http://knowledge-vault:3001)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vault-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - knowledge-vault
+    profiles:
+      - tunnel
+
+volumes:
+  vault-data:
+    external: true
+    name: ai-knowledge_vault-data

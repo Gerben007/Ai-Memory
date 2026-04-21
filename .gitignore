@@ -1,0 +1,6 @@
+node_modules
+dist
+# vault/*.md  — seed notes are committed; user notes will be created at runtime
+.env
+*.log
+.DS_Store

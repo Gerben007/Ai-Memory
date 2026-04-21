@@ -1,0 +1,402 @@
+@import "tailwindcss";
+
+/* ── Fonts ─────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Backgrounds — medium-dark slate */
+  --bg-base:       #1e1e2a;
+  --bg-nav:        #232331;
+  --bg-panel:      #282838;
+  --bg-surface:    rgba(255, 255, 255, 0.07);
+  --bg-surface-hover: rgba(255, 255, 255, 0.12);
+  --bg-glass:      rgba(255, 255, 255, 0.06);
+
+  /* Borders — clearly visible */
+  --border:        rgba(255, 255, 255, 0.14);
+  --border-hover:  rgba(255, 255, 255, 0.26);
+  --border-strong: rgba(255, 255, 255, 0.20);
+
+  /* Text — high contrast */
+  --text-primary:   #f0f1f7;
+  --text-secondary: #a8b0c8;
+  --text-muted:     #6e7694;
+
+  /* Accent — electric blue */
+  --accent:       #4b8df8;
+  --accent-hi:    #7ab4fc;
+  --accent-soft:  rgba(75, 141, 248, 0.15);
+  --accent-glow:  rgba(75, 141, 248, 0.25);
+
+  /* Secondary accent — teal */
+  --accent-2:      #2dd4bf;
+  --accent-2-soft: rgba(45, 212, 191, 0.1);
+
+  /* Status */
+  --green:  #4ade80;
+  --red:    #f87171;
+  --amber:  #fbbf24;
+
+  /* Gradients */
+  --gradient-1: #3b82f6;
+  --gradient-2: #8b5cf6;
+  --gradient-3: #2dd4bf;
+
+  /* Spacing / sizing */
+  --nav-w: 44px;
+  --panel-w: 256px;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+* {
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+}
+
+/* ── Ambient background ─────────────────────────────────────────────────── */
+.app-bg {
+  background: var(--bg-base);
+  position: relative;
+}
+.app-bg::before {
+  content: '';
+  position: fixed;
+  top: -25%;
+  left: 5%;
+  width: 45%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.app-bg::after {
+  content: '';
+  position: fixed;
+  bottom: -20%;
+  right: -5%;
+  width: 40%;
+  height: 45%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.04) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Glass ──────────────────────────────────────────────────────────────── */
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+.glass:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-surface-hover);
+}
+.glass-strong {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-primary:hover {
+  background: var(--accent-hi);
+  box-shadow: 0 0 20px var(--accent-glow), 0 0 40px rgba(59, 130, 246, 0.08);
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-secondary:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.06);
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+.input-glass {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: 'IBM Plex Sans', sans-serif;
+  outline: none;
+  transition: all 0.15s;
+}
+.input-glass::placeholder { color: var(--text-muted); }
+.input-glass:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* ── Editor ─────────────────────────────────────────────────────────────── */
+.editor-textarea {
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  tab-size: 2;
+  resize: none;
+  background: transparent;
+  line-height: 1.8;
+}
+
+/* ── Prose ──────────────────────────────────────────────────────────────── */
+.prose-vault {
+  color: var(--text-primary);
+  line-height: 1.82;
+  font-size: 14px;
+}
+.prose-vault h1, .prose-vault h2, .prose-vault h3, .prose-vault h4 {
+  color: #f0ebe0;
+  font-weight: 600;
+  margin-top: 1.6em;
+  margin-bottom: 0.5em;
+  letter-spacing: -0.02em;
+}
+.prose-vault h1 { font-size: 1.65rem; }
+.prose-vault h2 { font-size: 1.3rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+.prose-vault h3 { font-size: 1.1rem; }
+.prose-vault p { margin-bottom: 1em; }
+.prose-vault a {
+  color: var(--accent-hi);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.25);
+}
+.prose-vault a:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+.prose-vault code {
+  font-family: 'IBM Plex Mono', monospace;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.84em;
+  border: 1px solid var(--border);
+  color: #93c5fd;
+}
+.prose-vault pre {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+.prose-vault pre code {
+  background: transparent;
+  padding: 0;
+  border: none;
+  color: var(--text-primary);
+}
+.prose-vault blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 1em;
+  font-style: italic;
+}
+.prose-vault ul, .prose-vault ol { padding-left: 1.5rem; margin-bottom: 1em; }
+.prose-vault ul { list-style-type: disc; }
+.prose-vault ol { list-style-type: decimal; }
+.prose-vault li { margin-bottom: 0.3em; }
+.prose-vault table { width: 100%; border-collapse: collapse; margin-bottom: 1em; font-size: 13px; }
+.prose-vault th, .prose-vault td { border: 1px solid var(--border); padding: 0.45rem 0.75rem; text-align: left; }
+.prose-vault th { background: rgba(255,255,255,0.03); font-weight: 600; color: var(--text-primary); }
+.prose-vault hr { border: none; border-top: 1px solid var(--border); margin: 1.8em 0; }
+.prose-vault img { max-width: 100%; border-radius: var(--radius-lg); }
+
+/* ── Wikilinks ──────────────────────────────────────────────────────────── */
+.wikilink {
+  color: var(--accent-hi);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(96, 165, 250, 0.35);
+}
+.wikilink:hover { color: #93c5fd; border-bottom-color: #93c5fd; }
+
+/* ── Gradient text ──────────────────────────────────────────────────────── */
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-hi), var(--gradient-2) 60%, var(--gradient-3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Nav icon strip ─────────────────────────────────────────────────────── */
+.nav-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+  position: relative;
+}
+.nav-icon:hover {
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border-color: var(--border);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.1);
+}
+.nav-icon.active {
+  color: var(--accent-hi);
+  background: var(--accent-soft);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+/* Tooltip */
+.nav-icon::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 100;
+}
+.nav-icon:hover::after { opacity: 1; }
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 16px rgba(59, 130, 246, 0.08); }
+  50%       { box-shadow: 0 0 28px rgba(59, 130, 246, 0.18); }
+}
+.glow-pulse { animation: pulse-glow 3s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ── Legacy gray class remaps (secondary panels not yet refactored) ─────── */
+/* Maps hardcoded Tailwind grays to the new design token system */
+.border-gray-800 { border-color: var(--border) !important; }
+.border-gray-700 { border-color: var(--border-hover) !important; }
+.bg-gray-950     { background-color: var(--bg-base) !important; }
+.bg-gray-900     { background-color: var(--bg-panel) !important; }
+.text-gray-600   { color: var(--text-muted) !important; }
+.text-gray-500   { color: var(--text-muted) !important; }
+.text-gray-400   { color: var(--text-secondary) !important; }
+.text-gray-300   { color: var(--text-secondary) !important; }
+.text-gray-200   { color: var(--text-primary) !important; }
+.text-indigo-400 { color: var(--accent-hi) !important; }
+.text-indigo-500 { color: var(--accent-hi) !important; }
+.border-indigo-500 { border-color: var(--accent) !important; }
+.bg-indigo-600   { background-color: var(--accent) !important; }
+.bg-indigo-500   { background-color: var(--accent-hi) !important; }
+.focus\:border-indigo-500:focus { border-color: var(--accent) !important; }
+
+/* ── Note card ──────────────────────────────────────────────────────────── */
+.note-card {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.12s;
+  position: relative;
+}
+.note-card:hover {
+  background: var(--bg-surface);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.06);
+}
+.note-card.active {
+  background: var(--accent-soft);
+  border-left: 2px solid var(--accent);
+}
+.note-card-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 20px;
+}
+.note-card-preview {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.note-card.active .note-card-preview {
+  color: var(--text-secondary);
+}
+
+/* ── Hover glow — apply to any interactive card ──────────────────────────── */
+.hover-glow {
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.1), 0 0 36px rgba(59, 130, 246, 0.05);
+  border-color: var(--border-hover) !important;
+}
+
+/* ── Section divider ────────────────────────────────────────────────────── */
+.section-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 8px 14px 4px;
+}

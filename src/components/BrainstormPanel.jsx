@@ -1,0 +1,327 @@
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { useStore } from '../lib/store'
+import { renderMarkdown } from '../lib/markdownParser'
+import { chatCompletion } from '../lib/api'
+import { getTitle, getTags, getBody, getAllTagsWithCounts } from '../lib/tagUtils'
+import SourceCitation from './SourceCitation'
+
+const BRAINSTORM_MODES = [
+  {
+    key: 'insights',
+    icon: '🔗',
+    label: 'Vault Insights',
+    description: 'Patterns, connections, gaps — full vault analysis',
+    isFullVault: true,
+    systemPrompt: () => `You are a knowledge management advisor analyzing a personal knowledge vault. Be specific — reference actual note titles and tags. Write in structured markdown with clear sections. Focus on actionable insights.`
+  },
+  {
+    key: 'brainstorm',
+    icon: '💡',
+    label: 'Brainstorm',
+    description: 'Generate ideas or think through any question',
+    systemPrompt: (chunks) => `You are a creative thinking partner with access to the user's personal knowledge vault.
+Help them brainstorm, generate ideas, and think through problems based on their notes.
+Always reference specific notes when relevant. Be specific, actionable, and grounded in what's in their vault.
+
+=== VAULT CONTEXT ===
+${chunks}
+=== END CONTEXT ===`
+  },
+  {
+    key: 'challenge',
+    icon: '⚡',
+    label: 'Challenge My Thinking',
+    description: 'Get your assumptions questioned',
+    systemPrompt: (chunks) => `You are a thoughtful devil's advocate analyzing a personal knowledge vault.
+Your job is to constructively challenge the user's ideas, assumptions, and conclusions.
+For each challenge:
+1. Quote or reference the specific assumption you're challenging
+2. Explain why it might be wrong or incomplete
+3. Offer an alternative perspective
+4. Suggest what they could read or research to test this assumption
+
+Be respectful but rigorous. The goal is stronger thinking, not criticism.
+
+=== VAULT CONTEXT ===
+${chunks}
+=== END CONTEXT ===`
+  },
+  {
+    key: 'digest',
+    icon: '📊',
+    label: 'Weekly Digest',
+    description: 'Summarize recent themes and activity',
+    systemPrompt: (chunks) => `You are an AI assistant creating a weekly digest of a personal knowledge vault.
+Analyze all the notes and provide:
+
+## Themes
+Identify 3-5 major themes across the vault.
+
+## Key Insights
+What are the most important ideas captured?
+
+## Connections
+What notes relate to each other that might not be obviously linked?
+
+## Open Questions
+What questions remain unanswered based on the notes?
+
+## Suggested Next Steps
+What should the user focus on next based on their notes?
+
+Be concise and actionable.
+
+=== VAULT CONTEXT ===
+${chunks}
+=== END CONTEXT ===`
+  },
+  {
+    key: 'interview',
+    icon: '❓',
+    label: 'Vault Interview',
+    description: 'AI asks you questions to understand you better',
+    isFullVault: true,
+    isConversational: true,
+    systemPrompt: () => ''
+  }
+]
+
+function buildContext(results) {
+  return results.map(r => {
+    const h = r.chunk.heading ? ` > ${r.chunk.heading}` : ''
+    return `[${r.chunk.noteFilename}${h}]\n${r.chunk.text}`
+  }).join('\n\n')
+}
+
+export default function BrainstormPanel() {
+  const search = useStore(s => s.search)
+  const apiKey = useStore(s => s.apiKey)
+  const model = useStore(s => s.model)
+  const notes = useStore(s => s.notes)
+  const vaultContext = useStore(s => s.vaultContext)
+  const setActiveView = useStore(s => s.setActiveView)
+  const quickCapture = useStore(s => s.quickCapture)
+
+  const [mode, setMode] = useState(null)
+  const [input, setInput] = useState('')
+  const [response, setResponse] = useState('')
+  const [sources, setSources] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [savedIdea, setSavedIdea] = useState('')
+  const [conversationMessages, setConversationMessages] = useState([])
+  const responseRef = useRef(null)
+
+  // Full vault summary for insights/interview modes
+  const vaultSummary = useMemo(() => {
+    const tagCounts = getAllTagsWithCounts(notes)
+    const topTags = [...tagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 40)
+    const titles = notes.map(n => `- ${getTitle(n)} [${getTags(n).join(', ')}]`).join('\n')
+    const totalWords = notes.reduce((sum, n) => sum + (getBody(n) || '').split(/\s+/).filter(Boolean).length, 0)
+    return { noteCount: notes.length, tagCount: tagCounts.size, totalWords, topTags: topTags.map(([t, c]) => `${t}(${c})`).join(', '), titles }
+  }, [notes])
+
+  useEffect(() => {
+    if (responseRef.current) responseRef.current.scrollTop = responseRef.current.scrollHeight
+  }, [response])
+
+  const handleRun = async (selectedMode, userQuery) => {
+    if (!apiKey) {
+      setResponse('Please set your Claude API key in Settings first.')
+      return
+    }
+
+    const modeConfig = BRAINSTORM_MODES.find(m => m.key === selectedMode)
+    if (!modeConfig) return
+
+    setLoading(true)
+    setResponse('')
+    setSources([])
+
+    let systemPrompt, userMessage
+
+    if (modeConfig.isFullVault) {
+      // Full vault analysis modes (Insights, Interview)
+      const vaultInfo = `**Stats**: ${vaultSummary.noteCount} notes, ${vaultSummary.tagCount} tags, ~${vaultSummary.totalWords.toLocaleString()} words\n**Top tags**: ${vaultSummary.topTags}\n**Notes**:\n${vaultSummary.titles}`
+
+      if (selectedMode === 'insights') {
+        systemPrompt = modeConfig.systemPrompt()
+        userMessage = `Analyze my knowledge vault and give me insights:\n\n${vaultInfo}\n\n${vaultContext ? `Current profile:\n${vaultContext}` : ''}\n\nTell me:\n1. **Knowledge clusters** — What topics am I focused on?\n2. **Gaps** — What areas seem underdeveloped?\n3. **Connection opportunities** — Which notes should be linked?\n4. **Tag suggestions** — Tags to merge, split, or create?\n5. **One surprising observation**`
+      } else if (selectedMode === 'interview') {
+        systemPrompt = `You are a personal knowledge vault analyst. Interview the user to understand them deeply. You have their vault:\n\n${vaultInfo}\n\n${vaultContext ? `Current profile:\n${vaultContext}` : ''}\n\nAsk ONE focused, specific question at a time based on gaps you see in the vault. Reference actual note titles. Do NOT ask generic questions.`
+
+        if (conversationMessages.length === 0) {
+          userMessage = 'Analyze my vault and ask your first question about something you want to understand better.'
+        } else {
+          userMessage = userQuery || input
+        }
+      }
+    } else {
+      // BM25-based modes
+      const query = userQuery || modeConfig.label
+      const results = search(query, 15)
+      const context = buildContext(results)
+      setSources(results.map(r => ({ filename: r.chunk.noteFilename, noteTitle: r.chunk.noteTitle, heading: r.chunk.heading, score: r.score })))
+      systemPrompt = modeConfig.systemPrompt(context)
+
+      userMessage = userQuery
+        ? userQuery
+        : selectedMode === 'digest' ? `Create a digest of my vault. I have ${notes.length} notes.`
+        : selectedMode === 'challenge' ? 'Challenge the key assumptions and ideas in my vault.'
+        : 'Help me think about what I\'ve captured in my vault.'
+    }
+
+    try {
+      const messages = modeConfig.isConversational && conversationMessages.length > 0
+        ? [...conversationMessages, { role: 'user', content: userMessage }]
+        : [{ role: 'user', content: userMessage }]
+
+      const res = await chatCompletion({
+        model,
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages,
+        stream: false
+      }, apiKey)
+
+      const data = await res.json()
+      const text = data.content?.[0]?.text
+
+      if (text) {
+        setResponse(text)
+        if (modeConfig.isConversational) {
+          setConversationMessages([...messages, { role: 'assistant', content: text }])
+        }
+      } else {
+        setResponse('No response received. Try clicking **Regenerate**.')
+      }
+    } catch (err) {
+      const isOverload = err.type === 'overloaded_error' || err.status === 529
+      const isRateLimit = err.type === 'rate_limit_error' || err.status === 429
+      const detail = err.detail ? `\n\n*Debug: ${err.detail}*` : ''
+      if (isOverload) {
+        setResponse(`**Anthropic API is overloaded.** Wait 30 seconds and try again.${detail}`)
+      } else if (isRateLimit) {
+        setResponse(`**Rate limit reached.** Wait a minute and try again.${detail}`)
+      } else {
+        setResponse(`**Error:** ${err.message}\n\nCheck your API key in Settings.${detail}`)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSaveToVault = async () => {
+    if (!response) return
+    const snippet = response.slice(0, 80).replace(/[#*\n]/g, ' ').trim()
+    await quickCapture(`[Brainstorm] ${snippet}...`)
+    setSavedIdea('Saved to daily note!')
+    setTimeout(() => setSavedIdea(''), 2000)
+  }
+
+  // Mode selection screen
+  if (!mode) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="border-b border-gray-800 px-4 py-3 md:px-5 bg-gray-900/50">
+          <h2 className="text-base md:text-lg font-semibold text-gray-200">AI Studio</h2>
+          <p className="text-[10px] md:text-xs text-gray-500 mt-0.5">AI-powered thinking tools for your vault</p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
+            {BRAINSTORM_MODES.map(m => (
+              <button
+                key={m.key}
+                onClick={() => { setMode(m.key); setConversationMessages([]); if (m.key !== 'brainstorm') handleRun(m.key) }}
+                className="text-left bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-indigo-500/50 hover:bg-gray-900/80 transition-colors group"
+              >
+                <div className="text-2xl mb-2">{m.icon}</div>
+                <div className="text-sm font-medium text-gray-200 group-hover:text-indigo-400 transition-colors">{m.label}</div>
+                <div className="text-[11px] text-gray-500 mt-1">{m.description}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Vault overview */}
+          <div className="mt-6 max-w-2xl mx-auto bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+            <div className="text-xs text-gray-400 mb-2">Your vault at a glance</div>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div><span className="text-gray-500">Notes:</span> <span className="text-gray-200">{notes.length}</span></div>
+              <div><span className="text-gray-500">Tags:</span> <span className="text-gray-200">{new Set(notes.flatMap(n => n.frontmatter?.tags || [])).size}</span></div>
+              <div><span className="text-gray-500">Words:</span> <span className="text-gray-200">{notes.reduce((s, n) => s + (n.body || '').split(/\s+/).length, 0).toLocaleString()}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Active brainstorm mode
+  const currentMode = BRAINSTORM_MODES.find(m => m.key === mode)
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="border-b border-gray-800 px-4 py-3 md:px-5 bg-gray-900/50 flex items-center justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <button onClick={() => { setMode(null); setResponse(''); setSources([]); setConversationMessages([]) }} className="text-gray-400 hover:text-gray-200 text-sm shrink-0">&larr;</button>
+          <div className="min-w-0">
+            <h2 className="text-sm md:text-base font-semibold text-gray-200 truncate">{currentMode?.icon} {currentMode?.label}</h2>
+          </div>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          {response && (
+            <>
+              <button onClick={handleSaveToVault} className="text-[11px] bg-amber-600 text-white px-3 py-1 rounded-lg hover:bg-amber-500">
+                {savedIdea || 'Save to vault'}
+              </button>
+              <button onClick={() => handleRun(mode, input || undefined)} className="text-[11px] bg-gray-800 text-gray-300 px-3 py-1 rounded-lg hover:bg-gray-700 border border-gray-700">
+                Regenerate
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Response */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6" ref={responseRef}>
+        {loading && !response && (
+          <div className="text-center text-gray-500 mt-12">
+            <div className="text-3xl mb-3 animate-pulse">🧠</div>
+            <p className="text-sm">Analyzing your vault...</p>
+          </div>
+        )}
+        {response && (
+          <div className="max-w-2xl mx-auto">
+            <div className="prose-vault text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(response) }} />
+            {sources.length > 0 && (
+              <div className="mt-6">
+                <SourceCitation sources={sources} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Input for freeform / follow-up */}
+      <div className="border-t border-gray-800 p-3 md:p-4 bg-gray-900/50">
+        <div className="flex gap-2 max-w-2xl mx-auto">
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleRun(mode, input)}
+            placeholder={mode === 'interview' ? 'Answer the question...' : mode === 'brainstorm' ? 'What do you want to brainstorm about?' : 'Ask a follow-up question...'}
+            className="flex-1 bg-gray-800 text-gray-200 text-sm rounded-xl px-4 py-3 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500"
+            disabled={loading}
+          />
+          <button
+            onClick={() => handleRun(mode, input || undefined)}
+            disabled={loading}
+            className="bg-indigo-600 text-white px-5 py-3 rounded-xl hover:bg-indigo-500 disabled:opacity-50 text-sm font-medium shrink-0"
+          >
+            {loading ? '...' : 'Go'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
