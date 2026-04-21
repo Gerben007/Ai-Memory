@@ -10,7 +10,6 @@ import { Router } from 'express'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
-import crypto from 'crypto'
 
 function timingSafeEqualStr(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false
@@ -285,60 +284,16 @@ export function createMcpRoutes({ vaultBaseUrl, bearerToken, internalAuthBypass 
     return buildMcpServer(vaultBaseUrl, headers)
   }
 
-  // Session store: keeps server+transport alive across requests from the same client
-  const sessions = new Map()
-  const SESSION_TTL = 30 * 60 * 1000 // 30 min
-
-  // Clean up stale sessions periodically
-  setInterval(() => {
-    const now = Date.now()
-    for (const [id, session] of sessions) {
-      if (now - session.lastActive > SESSION_TTL) {
-        session.transport.close()
-        session.server.close()
-        sessions.delete(id)
-      }
-    }
-  }, 5 * 60 * 1000)
-
+  // Stateless mode: each request gets a fresh server+transport.
+  // Cloudflare Tunnel strips Mcp-Session-Id headers, so session-based
+  // MCP doesn't work. Stateless mode handles every request independently.
   router.post('/', async (req, res) => {
-    const sessionId = req.headers['mcp-session-id']
-
-    // Existing session — reuse server+transport
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)
-      session.lastActive = Date.now()
-      try {
-        await session.transport.handleRequest(req, res, req.body)
-      } catch (err) {
-        console.error('[MCP] session request error:', err)
-        if (!res.headersSent) res.status(500).json({ error: err.message })
-      }
-      return
-    }
-
-    // New session — create server+transport with session ID generator
     try {
       const server = buildInternalServer()
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID()
-      })
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
+      res.on('close', () => { transport.close(); server.close() })
       await server.connect(transport)
-
-      // Store session after initialize so subsequent requests reuse it
-      transport.onclose = () => {
-        const sid = transport.sessionId
-        if (sid && sessions.has(sid)) {
-          sessions.delete(sid)
-        }
-      }
-
       await transport.handleRequest(req, res, req.body)
-
-      const sid = transport.sessionId
-      if (sid) {
-        sessions.set(sid, { server, transport, lastActive: Date.now() })
-      }
     } catch (err) {
       console.error('[MCP] request error:', err)
       if (!res.headersSent) res.status(500).json({ error: err.message })
@@ -346,29 +301,11 @@ export function createMcpRoutes({ vaultBaseUrl, bearerToken, internalAuthBypass 
   })
 
   router.get('/', (req, res) => {
-    const sessionId = req.headers['mcp-session-id']
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)
-      session.lastActive = Date.now()
-      session.transport.handleRequest(req, res).catch(err => {
-        console.error('[MCP] GET error:', err)
-        if (!res.headersSent) res.status(500).json({ error: err.message })
-      })
-      return
-    }
     res.set('Allow', 'POST').status(405).json({ error: 'Use POST for Streamable HTTP MCP' })
   })
 
   router.delete('/', (req, res) => {
-    const sessionId = req.headers['mcp-session-id']
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)
-      session.transport.close()
-      session.server.close()
-      sessions.delete(sessionId)
-      return res.status(200).json({ closed: true })
-    }
-    res.status(404).json({ error: 'Session not found' })
+    res.set('Allow', 'POST').status(405).json({ error: 'Use POST for Streamable HTTP MCP' })
   })
 
   return router
