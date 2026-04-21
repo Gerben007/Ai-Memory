@@ -7,7 +7,13 @@ services:
     ports:
       - "3002:3001"
     volumes:
-      - vault-data:/data/vault
+      # Bind-mount the TrueNAS-backed NFS vault directly into the container.
+      # Source of truth lives on TrueNAS dataset tank/vault; Git history and
+      # Syncthing replication are handled on the host, not inside this
+      # container. The old named volume `ai-knowledge_vault-data` is
+      # preserved untouched for a later data-migration session — do NOT
+      # `docker volume rm` it.
+      - /mnt/vault:/data/vault
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -33,8 +39,3 @@ services:
       - knowledge-vault
     profiles:
       - tunnel
-
-volumes:
-  vault-data:
-    external: true
-    name: ai-knowledge_vault-data
