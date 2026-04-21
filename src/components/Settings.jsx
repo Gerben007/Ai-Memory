@@ -31,7 +31,7 @@ export default function Settings() {
   const [tokenStatus, setTokenStatus] = useState('')
 
   // Email ingestion state
-  const [emailCfg, setEmailCfg] = useState({ enabled: false, host: 'protonmail-bridge', port: 1143, secure: false, user: '', pass: '', pollInterval: 5 })
+  const [emailCfg, setEmailCfg] = useState({ enabled: false, host: 'imap.gmail.com', port: 993, secure: true, user: '', pass: '', pollInterval: 5 })
   const [emailStatus, setEmailStatus] = useState(null)
   const [emailMsg, setEmailMsg] = useState('')
   const [emailTesting, setEmailTesting] = useState(false)
@@ -347,7 +347,7 @@ export default function Settings() {
         <section>
           <h3 className="text-sm font-semibold text-gray-300 mb-3">Email Ingestion</h3>
           <p className="text-xs text-gray-500 mb-3">
-            Forward emails to your vault address — they'll be processed by Claude into structured knowledge notes.
+            Forward emails to your vault Gmail — they'll be processed by Claude into structured knowledge notes. Use a Gmail app password (not your regular password).
           </p>
 
           <div className="space-y-3">
@@ -370,29 +370,25 @@ export default function Settings() {
             </div>
 
             {/* Preset */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEmailCfg(prev => ({ ...prev, host: 'protonmail-bridge', port: 1143, secure: false }))}
-                className="text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
-                style={{
-                  background: emailCfg.host === 'protonmail-bridge' ? 'var(--accent-soft)' : 'var(--bg-surface)',
-                  borderColor: emailCfg.host === 'protonmail-bridge' ? 'var(--accent)' : 'var(--border)',
-                  color: emailCfg.host === 'protonmail-bridge' ? 'var(--accent-hi)' : 'var(--text-secondary)'
-                }}
-              >
-                ProtonMail Bridge
-              </button>
-              <button
-                onClick={() => setEmailCfg(prev => ({ ...prev, host: 'outlook.office365.com', port: 993, secure: true }))}
-                className="text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
-                style={{
-                  background: emailCfg.host === 'outlook.office365.com' ? 'var(--accent-soft)' : 'var(--bg-surface)',
-                  borderColor: emailCfg.host === 'outlook.office365.com' ? 'var(--accent)' : 'var(--border)',
-                  color: emailCfg.host === 'outlook.office365.com' ? 'var(--accent-hi)' : 'var(--text-secondary)'
-                }}
-              >
-                Office 365
-              </button>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label: 'Gmail', host: 'imap.gmail.com', port: 993, secure: true },
+                { label: 'Office 365', host: 'outlook.office365.com', port: 993, secure: true },
+                { label: 'Yahoo', host: 'imap.mail.yahoo.com', port: 993, secure: true },
+              ].map(preset => (
+                <button
+                  key={preset.host}
+                  onClick={() => setEmailCfg(prev => ({ ...prev, host: preset.host, port: preset.port, secure: preset.secure }))}
+                  className="text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
+                  style={{
+                    background: emailCfg.host === preset.host ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                    borderColor: emailCfg.host === preset.host ? 'var(--accent)' : 'var(--border)',
+                    color: emailCfg.host === preset.host ? 'var(--accent-hi)' : 'var(--text-secondary)'
+                  }}
+                >
+                  {preset.label}
+                </button>
+              ))}
             </div>
 
             {/* Connection fields */}
@@ -422,12 +418,12 @@ export default function Settings() {
                 type="text"
                 value={emailCfg.user}
                 onChange={e => setEmailCfg(prev => ({ ...prev, user: e.target.value }))}
-                placeholder="vault@stratusfinance.co.za"
+                placeholder="gerben.boersema+vault@gmail.com"
                 className="w-full bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-500 block mb-1">Password (Bridge-generated)</label>
+              <label className="text-[10px] text-gray-500 block mb-1">Password (App password)</label>
               <div className="flex gap-2">
                 <input
                   type={showEmailPass ? 'text' : 'password'}
