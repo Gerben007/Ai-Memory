@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "knowledge-vault": {
+      "type": "http",
+      "url": "https://vault.stratusfinance.co.za/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_BEARER_TOKEN}"
+      }
+    }
+  }
+}

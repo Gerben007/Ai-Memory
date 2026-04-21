@@ -9,6 +9,7 @@ import { createSearchRoutes } from './searchRoutes.js'
 import { createEmailPoller } from './emailPoller.js'
 import { createAuth } from './auth.js'
 import { createAuthMiddleware, authStatusHandler } from './authMiddleware.js'
+import { createMcpRoutes } from './mcpRoutes.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -183,12 +184,16 @@ app.post('/api/email/test', async (req, res) => {
   }
 })
 
-// Restart poller when config changes
-const origConfigPost = app._router.stack
 app.post('/api/config/email-restart', (req, res) => {
   emailPoller.restart()
   res.json({ restarted: true })
 })
+
+// Remote MCP endpoint (Streamable HTTP, bearer-guarded)
+app.use('/mcp', createMcpRoutes({
+  vaultBaseUrl: `http://127.0.0.1:${PORT}`,
+  bearerToken: process.env.MCP_BEARER_TOKEN || ''
+}))
 
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {

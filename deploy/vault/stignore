@@ -1,0 +1,10 @@
+.git
+.obsidian/workspace*
+.obsidian/cache
+.trash
+*.conflict.md
+.DS_Store
+Thumbs.db
+_ingest/_staging
+.stfolder
+.stversions
