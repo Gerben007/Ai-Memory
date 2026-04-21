@@ -54,17 +54,20 @@ app.use(express.text())
 const INTERNAL_BYPASS = crypto.randomBytes(32).toString('hex')
 
 // Auth: login screen (cookie-based) + bearer token middleware
+// Either a valid session cookie OR a valid bearer token grants access.
 const auth = createAuth({ vaultDir: VAULT_DIR })
 const bearerAuth = createAuthMiddleware()
 app.use('/api/auth', auth.router)
 app.get('/api/auth/status', authStatusHandler)
 app.use('/api', (req, res, next) => {
   if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
-  bearerAuth(req, res, next)
-})
-app.use('/api', (req, res, next) => {
-  if (req.headers['x-internal-bypass'] === INTERNAL_BYPASS) return next()
-  auth.middleware(req, res, next)
+  // If request has a Bearer header, use bearer auth; otherwise use cookie auth
+  const hasBearer = /^Bearer\s/i.test(req.headers['authorization'] || '')
+  if (hasBearer) {
+    bearerAuth(req, res, next)
+  } else {
+    auth.middleware(req, res, next)
+  }
 })
 
 // Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
