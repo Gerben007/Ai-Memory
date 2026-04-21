@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../lib/store'
 import { getAllTagsWithCounts } from '../lib/tagUtils'
+import { saveConfig, fetchEmailStatus, triggerEmailSync, testEmailConnection, restartEmailPoller } from '../lib/api'
 import TagCleanup from './TagCleanup'
 import AgentPanel from './AgentPanel'
 import JSZip from 'jszip'
@@ -25,8 +26,81 @@ export default function Settings() {
   const [showTagCleanup, setShowTagCleanup] = useState(false)
   const [contextStatus, setContextStatus] = useState('')
 
-  // Load vault context on mount
-  useEffect(() => { loadContext() }, [])
+  // Email ingestion state
+  const [emailCfg, setEmailCfg] = useState({ enabled: false, host: 'protonmail-bridge', port: 1143, secure: false, user: '', pass: '', pollInterval: 5 })
+  const [emailStatus, setEmailStatus] = useState(null)
+  const [emailMsg, setEmailMsg] = useState('')
+  const [emailTesting, setEmailTesting] = useState(false)
+  const [emailSyncing, setEmailSyncing] = useState(false)
+  const [showEmailPass, setShowEmailPass] = useState(false)
+
+  const loadEmailStatus = useCallback(async () => {
+    try {
+      const s = await fetchEmailStatus()
+      setEmailStatus(s)
+    } catch {}
+  }, [])
+
+  // Load vault context + email status on mount
+  useEffect(() => { loadContext(); loadEmailStatus() }, [])
+
+  // Load email config from server config
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/config')
+        const cfg = await res.json()
+        if (cfg.email) setEmailCfg(prev => ({ ...prev, ...cfg.email }))
+      } catch {}
+    })()
+  }, [])
+
+  const handleSaveEmail = async () => {
+    try {
+      await saveConfig({ email: emailCfg })
+      await restartEmailPoller()
+      setEmailMsg('Saved!')
+      loadEmailStatus()
+    } catch (err) {
+      setEmailMsg(`Error: ${err.message}`)
+    }
+    setTimeout(() => setEmailMsg(''), 3000)
+  }
+
+  const handleTestEmail = async () => {
+    setEmailTesting(true)
+    setEmailMsg('Testing connection...')
+    try {
+      const result = await testEmailConnection(emailCfg)
+      if (result.success) {
+        setEmailMsg(`Connected! ${result.messageCount} messages in inbox.`)
+      } else {
+        setEmailMsg(`Failed: ${result.error}`)
+      }
+    } catch (err) {
+      setEmailMsg(`Error: ${err.message}`)
+    }
+    setEmailTesting(false)
+    setTimeout(() => setEmailMsg(''), 5000)
+  }
+
+  const handleSyncEmail = async () => {
+    setEmailSyncing(true)
+    setEmailMsg('Syncing...')
+    try {
+      const result = await triggerEmailSync()
+      if (result.skipped) {
+        setEmailMsg(result.reason)
+      } else {
+        setEmailMsg(`Done: ${result.processed} processed, ${result.skipped} skipped`)
+      }
+      loadEmailStatus()
+    } catch (err) {
+      setEmailMsg(`Error: ${err.message}`)
+    }
+    setEmailSyncing(false)
+    setTimeout(() => setEmailMsg(''), 5000)
+  }
 
   const tagCount = getAllTagsWithCounts(notes).size
 
@@ -219,6 +293,170 @@ export default function Settings() {
                 <div className="text-xs text-gray-400 whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed">
                   {vaultContext}
                 </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Email Ingestion */}
+        <section>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Email Ingestion</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Forward emails to your vault address — they'll be processed by Claude into structured knowledge notes.
+          </p>
+
+          <div className="space-y-3">
+            {/* Enable toggle */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Enable email polling</span>
+              <button
+                onClick={() => setEmailCfg(prev => ({ ...prev, enabled: !prev.enabled }))}
+                className="relative w-10 h-5 rounded-full transition-colors"
+                style={{ background: emailCfg.enabled ? 'var(--accent)' : 'var(--bg-surface)' }}
+              >
+                <span
+                  className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+                  style={{
+                    background: '#fff',
+                    left: emailCfg.enabled ? '22px' : '2px'
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Preset */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEmailCfg(prev => ({ ...prev, host: 'protonmail-bridge', port: 1143, secure: false }))}
+                className="text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
+                style={{
+                  background: emailCfg.host === 'protonmail-bridge' ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                  borderColor: emailCfg.host === 'protonmail-bridge' ? 'var(--accent)' : 'var(--border)',
+                  color: emailCfg.host === 'protonmail-bridge' ? 'var(--accent-hi)' : 'var(--text-secondary)'
+                }}
+              >
+                ProtonMail Bridge
+              </button>
+              <button
+                onClick={() => setEmailCfg(prev => ({ ...prev, host: 'outlook.office365.com', port: 993, secure: true }))}
+                className="text-[11px] px-3 py-1.5 rounded-lg border transition-colors"
+                style={{
+                  background: emailCfg.host === 'outlook.office365.com' ? 'var(--accent-soft)' : 'var(--bg-surface)',
+                  borderColor: emailCfg.host === 'outlook.office365.com' ? 'var(--accent)' : 'var(--border)',
+                  color: emailCfg.host === 'outlook.office365.com' ? 'var(--accent-hi)' : 'var(--text-secondary)'
+                }}
+              >
+                Office 365
+              </button>
+            </div>
+
+            {/* Connection fields */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">IMAP Host</label>
+                <input
+                  type="text"
+                  value={emailCfg.host}
+                  onChange={e => setEmailCfg(prev => ({ ...prev, host: e.target.value }))}
+                  className="w-full bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 block mb-1">Port</label>
+                <input
+                  type="number"
+                  value={emailCfg.port}
+                  onChange={e => setEmailCfg(prev => ({ ...prev, port: parseInt(e.target.value) || 1143 }))}
+                  className="w-full bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-1">Username (email address)</label>
+              <input
+                type="text"
+                value={emailCfg.user}
+                onChange={e => setEmailCfg(prev => ({ ...prev, user: e.target.value }))}
+                placeholder="vault@stratusfinance.co.za"
+                className="w-full bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-1">Password (Bridge-generated)</label>
+              <div className="flex gap-2">
+                <input
+                  type={showEmailPass ? 'text' : 'password'}
+                  value={emailCfg.pass}
+                  onChange={e => setEmailCfg(prev => ({ ...prev, pass: e.target.value }))}
+                  className="flex-1 bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none font-mono"
+                />
+                <button
+                  onClick={() => setShowEmailPass(!showEmailPass)}
+                  className="text-xs bg-gray-800 text-gray-400 px-2.5 rounded-lg hover:bg-gray-700 border border-gray-700"
+                >
+                  {showEmailPass ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
+
+            {/* Poll interval */}
+            <div>
+              <label className="text-[10px] text-gray-500 block mb-1">Poll interval</label>
+              <select
+                value={emailCfg.pollInterval}
+                onChange={e => setEmailCfg(prev => ({ ...prev, pollInterval: parseInt(e.target.value) }))}
+                className="bg-gray-800 text-gray-200 text-xs rounded-lg px-3 py-2 border border-gray-700 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value={1}>Every 1 minute</option>
+                <option value={5}>Every 5 minutes</option>
+                <option value={15}>Every 15 minutes</option>
+                <option value={30}>Every 30 minutes</option>
+              </select>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={handleSaveEmail} className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-500">
+                Save
+              </button>
+              <button onClick={handleTestEmail} disabled={emailTesting} className="text-xs bg-gray-800 text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
+                {emailTesting ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button onClick={handleSyncEmail} disabled={emailSyncing || !emailCfg.enabled} className="text-xs bg-gray-800 text-gray-300 px-4 py-2 rounded-lg hover:bg-gray-700 disabled:opacity-50">
+                {emailSyncing ? 'Syncing...' : 'Sync Now'}
+              </button>
+            </div>
+
+            {/* Status */}
+            {emailMsg && (
+              <div className={`text-xs px-1 ${emailMsg.includes('Error') || emailMsg.includes('Failed') ? 'text-red-400' : emailMsg.includes('Done') || emailMsg.includes('Connected') || emailMsg === 'Saved!' ? 'text-green-400' : 'text-amber-400'}`}>
+                {emailMsg}
+              </div>
+            )}
+            {emailStatus && (
+              <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Status</span>
+                  <span className={emailStatus.enabled ? 'text-green-400' : 'text-gray-500'}>
+                    {emailStatus.enabled ? 'Active' : 'Disabled'}
+                  </span>
+                </div>
+                {emailStatus.lastPoll && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Last checked</span>
+                    <span className="text-gray-300">{new Date(emailStatus.lastPoll).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Total processed</span>
+                  <span className="text-gray-300">{emailStatus.totalProcessed || 0}</span>
+                </div>
+                {emailStatus.lastError && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Last error</span>
+                    <span className="text-red-400 truncate ml-4">{emailStatus.lastError}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

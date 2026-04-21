@@ -118,6 +118,32 @@ Write ONLY the markdown profile. Be concise but thorough.`
   return { content }
 }
 
+// Email ingestion
+export async function fetchEmailStatus() {
+  const res = await fetch(`${API_BASE}/email/status`)
+  if (!res.ok) return { enabled: false }
+  return res.json()
+}
+
+export async function triggerEmailSync() {
+  const res = await fetch(`${API_BASE}/email/sync`, { method: 'POST' })
+  return res.json()
+}
+
+export async function testEmailConnection(cfg) {
+  const res = await fetch(`${API_BASE}/email/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg)
+  })
+  return res.json()
+}
+
+export async function restartEmailPoller() {
+  const res = await fetch(`${API_BASE}/config/email-restart`, { method: 'POST' })
+  return res.json()
+}
+
 export async function chatCompletion(body, apiKey, { retries = 2 } = {}) {
   let lastError
 

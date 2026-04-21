@@ -6,6 +6,7 @@ import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
+import { createEmailPoller } from './emailPoller.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -116,6 +117,38 @@ if (createImportRoutes) {
   app.use('/api/import', createImportRoutes(VAULT_DIR))
 }
 
+// Email poller
+const emailPoller = createEmailPoller(VAULT_DIR, CONFIG_PATH)
+
+app.get('/api/email/status', (req, res) => {
+  res.json(emailPoller.getStatus())
+})
+
+app.post('/api/email/sync', async (req, res) => {
+  try {
+    const result = await emailPoller.poll()
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/email/test', async (req, res) => {
+  try {
+    const result = await emailPoller.testConnection(req.body)
+    res.json(result)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Restart poller when config changes
+const origConfigPost = app._router.stack
+app.post('/api/config/email-restart', (req, res) => {
+  emailPoller.restart()
+  res.json({ restarted: true })
+})
+
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '..', 'dist')
@@ -128,4 +161,5 @@ if (process.env.NODE_ENV === 'production') {
 app.listen(PORT, HOST, () => {
   console.log(`Knowledge Vault server running on http://${HOST}:${PORT}`)
   console.log(`Vault directory: ${VAULT_DIR}`)
+  emailPoller.start()
 })
