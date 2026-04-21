@@ -1,14 +1,15 @@
-# Portainer Web Editor stack — paste this into Portainer > Stacks > ai-memory > Editor
+# Portainer Web Editor stack for the `ai-memory` stack on core-services VM.
+#
+# Deploy via: Portainer > Stacks > + Add stack > Web editor > paste this,
+# name the stack `ai-memory`, Deploy the stack.
 #
 # Prerequisites on the Core Services VM:
 #   1. NFS mount /mnt/vault is up (see fstab entry)
 #   2. Git is initialised in /mnt/vault (deploy/vault/01-git-init.sh)
 #   3. Auto-commit timer installed (deploy/vault/02-install-autocommit.sh)
-#
-# Build the image once on the VM:
-#   git clone git@github.com:Gerben007/Ai-Memory.git
-#   cd Ai-Memory
-#   docker build -t knowledge-vault:latest .
+#   4. Image `knowledge-vault:latest` exists locally — already present from
+#      previous CLI-driven deployments; rebuild with `docker build -t
+#      knowledge-vault:latest .` from the repo root if needed.
 #
 # The old named volume `ai-knowledge_vault-data` is intentionally NOT removed
 # from Docker — it stays around so we can migrate its contents into /mnt/vault
@@ -20,7 +21,9 @@ services:
     container_name: knowledge-vault
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      # Host 3002 -> container 3001, matches the pre-migration external port
+      # so downstream consumers of http://192.168.20.62:3002 keep working.
+      - "3002:3001"
     volumes:
       # Bind-mount the TrueNAS-backed NFS vault directly into the container.
       # Source of truth lives on TrueNAS dataset tank/vault; Git history and
