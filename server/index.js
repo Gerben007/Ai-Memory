@@ -161,6 +161,28 @@ app.post('/api/clip', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// Serve attachment files (images, PDFs, etc.)
+const ATTACHMENTS_DIR = path.join(VAULT_DIR, 'attachments')
+if (!fs.existsSync(ATTACHMENTS_DIR)) {
+  fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true })
+}
+app.use('/api/attachments', express.static(ATTACHMENTS_DIR))
+
+// List available attachments
+app.get('/api/attachments-list', (req, res) => {
+  try {
+    if (!fs.existsSync(ATTACHMENTS_DIR)) return res.json([])
+    const files = fs.readdirSync(ATTACHMENTS_DIR).filter(f => !f.startsWith('.'))
+    const list = files.map(f => {
+      const stat = fs.statSync(path.join(ATTACHMENTS_DIR, f))
+      return { name: f, size: stat.size, modified: stat.mtime.toISOString() }
+    })
+    res.json(list)
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // API routes
 app.use('/api/notes', createFileRoutes(VAULT_DIR))
 app.use('/api/chat', createAnthropicProxy())

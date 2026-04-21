@@ -248,7 +248,7 @@ export function createEmailPoller(vaultDir, configPath) {
 
       try {
         fs.writeFileSync(filePath, att.content)
-        savedFiles.push({ name: filename, path: `attachments/${safeName}`, size: att.size || att.content.length, type: att.contentType })
+        savedFiles.push({ name: filename, path: `/api/attachments/${safeName}`, size: att.size || att.content.length, type: att.contentType })
         console.log(`[Email] Saved attachment: ${safeName} (${att.contentType})`)
 
         const extracted = await extractAttachmentText(att.content, filename)

@@ -216,6 +216,29 @@ function buildMcpServer(vaultBaseUrl, extraHeaders = {}) {
     }
   )
 
+  server.tool(
+    'vault_list_attachments',
+    'List all attachment files stored in the vault (PDFs, images, documents from emails etc.)',
+    {},
+    async () => {
+      const files = await vaultFetchJson('/api/attachments-list')
+      if (files.length === 0) return { content: [{ type: 'text', text: 'No attachments in the vault.' }] }
+      const list = files.map(f => `- ${f.name} (${(f.size / 1024).toFixed(1)} KB, ${f.modified})`).join('\n')
+      return { content: [{ type: 'text', text: `Vault attachments: ${files.length} files\n\n${list}` }] }
+    }
+  )
+
+  server.tool(
+    'vault_get_attachment_url',
+    'Get the download URL for a vault attachment. Use vault_list_attachments to see available files.',
+    { filename: z.string().describe('Attachment filename (e.g. "fw-dam-sealing-referral-ernst-koen-Invoice_INV-0003691.pdf")') },
+    async ({ filename }) => {
+      const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '')
+      const url = `${vaultBaseUrl}/api/attachments/${encodeURIComponent(safe)}`
+      return { content: [{ type: 'text', text: `Attachment URL: ${url}\n\nNote: This is the internal server URL. The public URL depends on your tunnel/domain configuration.` }] }
+    }
+  )
+
   return server
 }
 
