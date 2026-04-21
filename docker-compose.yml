@@ -12,6 +12,11 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      # Set AUTH_PASSWORD in .env to require login (strongly recommended when
+      # exposing via cloudflared). Leave blank for local-only open access.
+      - AUTH_PASSWORD=${AUTH_PASSWORD:-}
+      - AUTH_SECRET=${AUTH_SECRET:-}
+      - AUTH_SESSION_DAYS=${AUTH_SESSION_DAYS:-30}
 
   # Cloudflare Tunnel — exposes vault externally via your domain
   # To set up:

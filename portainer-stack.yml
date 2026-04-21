@@ -19,6 +19,11 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      # Set AUTH_PASSWORD to require a login screen (recommended when exposing
+      # via cloudflared). Leave blank for open/local-only access.
+      - AUTH_PASSWORD=
+      - AUTH_SECRET=
+      - AUTH_SESSION_DAYS=30
 
 volumes:
   vault-data:

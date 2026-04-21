@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { getAllTagsWithCounts } from '../lib/tagUtils'
+import { fetchAuthStatus, logout as authLogout } from '../lib/auth'
 import TagCleanup from './TagCleanup'
 import AgentPanel from './AgentPanel'
 import JSZip from 'jszip'
@@ -24,9 +25,20 @@ export default function Settings() {
   const [confirmClear, setConfirmClear] = useState(false)
   const [showTagCleanup, setShowTagCleanup] = useState(false)
   const [contextStatus, setContextStatus] = useState('')
+  const [authRequired, setAuthRequired] = useState(false)
 
   // Load vault context on mount
   useEffect(() => { loadContext() }, [])
+
+  // Detect whether the server requires login (to show/hide Sign out button)
+  useEffect(() => {
+    fetchAuthStatus().then(s => setAuthRequired(!!s.required))
+  }, [])
+
+  const handleLogout = async () => {
+    await authLogout()
+    window.location.reload()
+  }
 
   const tagCount = getAllTagsWithCounts(notes).size
 
@@ -311,6 +323,16 @@ export default function Settings() {
               >
                 <div className="font-medium">Clear Chat History</div>
                 <div className="text-xs text-gray-500 mt-0.5">Remove all AI chat messages from localStorage</div>
+              </button>
+            )}
+
+            {authRequired && (
+              <button
+                onClick={handleLogout}
+                className="w-full text-left text-sm bg-gray-800 text-gray-300 px-4 py-3 rounded-lg hover:bg-gray-700 border border-gray-700"
+              >
+                <div className="font-medium">Sign Out</div>
+                <div className="text-xs text-gray-500 mt-0.5">End your session on this device</div>
               </button>
             )}
           </div>
