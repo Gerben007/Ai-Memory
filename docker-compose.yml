@@ -26,10 +26,16 @@ services:
       - MCP_BEARER_TOKEN=${MCP_BEARER_TOKEN:-}
 
   # ProtonMail Bridge — IMAP access to vault@stratusfinance.co.za
+  # After first start: docker exec -it protonmail-bridge bash
+  #   Then: /protonmail/proton-bridge --cli --noninteractive
+  #   > login vault@stratusfinance.co.za  (enter password + 2FA)
+  #   > info  (copy the Bridge IMAP password)
   protonmail-bridge:
-    image: shenxn/protonmail-bridge
+    image: shenxn/protonmail-bridge:3.0.21-1
     container_name: protonmail-bridge
     restart: unless-stopped
+    environment:
+      - PROTONMAIL_BRIDGE_DISABLE_UPDATES=1
     volumes:
       - bridge-data:/root
     profiles:
