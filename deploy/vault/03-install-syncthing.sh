@@ -34,22 +34,32 @@ VAULT=/mnt/vault
 
 # ---------------------------------------------------------------------------
 # 1. Syncthing apt repo (https://apt.syncthing.net/)
+#    We always re-do the keyring + list file — a broken prior run leaves
+#    files that would otherwise make an "already added" guard skip the
+#    fix. Clean up stale state, then lay it down canonically.
 # ---------------------------------------------------------------------------
-if [[ ! -f /etc/apt/sources.list.d/syncthing.sources ]] && \
-   [[ ! -f /etc/apt/sources.list.d/syncthing.list ]]; then
-    echo "==> Adding Syncthing apt repo"
-    sudo install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://syncthing.net/release-key.gpg |
-        sudo tee /etc/apt/keyrings/syncthing-archive-keyring.asc >/dev/null
-    echo "deb [signed-by=/etc/apt/keyrings/syncthing-archive-keyring.asc] https://apt.syncthing.net/ syncthing stable" |
-        sudo tee /etc/apt/sources.list.d/syncthing.list >/dev/null
+echo "==> Configuring Syncthing apt repo"
+sudo install -d -m 0755 /etc/apt/keyrings
+sudo rm -f /etc/apt/keyrings/syncthing-archive-keyring.asc \
+           /etc/apt/keyrings/syncthing-archive-keyring.gpg \
+           /etc/apt/sources.list.d/syncthing.list \
+           /etc/apt/sources.list.d/syncthing.sources
+# gpg --dearmor reads either binary or ASCII-armored input and writes a
+# binary keyring, which is what apt expects at the signed-by= path.
+if ! command -v gpg >/dev/null 2>&1; then
     sudo apt-get update -qq
+    sudo apt-get install -y gnupg
 fi
+curl -fsSL https://syncthing.net/release-key.gpg \
+    | sudo gpg --dearmor -o /etc/apt/keyrings/syncthing-archive-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/syncthing-archive-keyring.gpg] https://apt.syncthing.net/ syncthing stable" \
+    | sudo tee /etc/apt/sources.list.d/syncthing.list >/dev/null
+sudo apt-get update -qq
 
 # ---------------------------------------------------------------------------
 # 2. Install syncthing
 # ---------------------------------------------------------------------------
-if ! dpkg -l | grep -q "^ii  syncthing "; then
+if ! command -v syncthing >/dev/null 2>&1; then
     echo "==> Installing syncthing"
     sudo apt-get install -y syncthing
 fi
