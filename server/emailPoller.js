@@ -3,6 +3,75 @@ import { simpleParser } from 'mailparser'
 import fs from 'fs'
 import path from 'path'
 
+let _PDFParse, _XLSX, _mammoth
+async function loadParser(name) {
+  try {
+    switch (name) {
+      case 'pdf':     if (!_PDFParse) _PDFParse = (await import('pdf-parse')).PDFParse;    return _PDFParse
+      case 'xlsx':    if (!_XLSX)     _XLSX     = (await import('xlsx')).default;           return _XLSX
+      case 'mammoth': if (!_mammoth)  _mammoth  = (await import('mammoth')).default;        return _mammoth
+    }
+  } catch { return null }
+  return null
+}
+
+async function extractAttachmentText(buffer, filename) {
+  const ext = path.extname(filename).toLowerCase()
+  try {
+    if (ext === '.pdf') {
+      const PDFParse = await loadParser('pdf')
+      if (!PDFParse) return null
+      const tmpPath = `/tmp/att-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`
+      fs.writeFileSync(tmpPath, buffer)
+      const parser = new PDFParse({})
+      await parser.load(tmpPath)
+      const info = await parser.getInfo().catch(() => ({}))
+      const numPages = info?.Pages || 1
+      const pages = []
+      for (let i = 1; i <= numPages; i++) {
+        try {
+          const t = await parser.getPageText(i)
+          if (t?.trim()) pages.push(t.trim())
+        } catch {}
+      }
+      if (!pages.length) {
+        try { const t = await parser.getText(); if (t?.trim()) pages.push(t.trim()) } catch {}
+      }
+      parser.destroy()
+      fs.unlinkSync(tmpPath)
+      return pages.join('\n\n') || null
+    }
+    if (ext === '.docx') {
+      const mammoth = await loadParser('mammoth')
+      if (!mammoth) return null
+      const result = await mammoth.convertToMarkdown({ buffer })
+      return result.value || null
+    }
+    if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') {
+      const XLSX = await loadParser('xlsx')
+      if (!XLSX) return null
+      const workbook = XLSX.read(buffer)
+      const parts = []
+      for (const name of workbook.SheetNames) {
+        const json = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 })
+        if (!json.length) continue
+        const header = json[0].map(h => String(h || ''))
+        const rows = json.slice(1, 101)
+        let md = `**${name}**\n| ${header.join(' | ')} |\n| ${header.map(() => '---').join(' | ')} |\n`
+        for (const row of rows) md += `| ${row.map(c => String(c || '')).join(' | ')} |\n`
+        parts.push(md)
+      }
+      return parts.join('\n\n') || null
+    }
+    if (ext === '.txt' || ext === '.md' || ext === '.json' || ext === '.xml' || ext === '.html' || ext === '.htm') {
+      return buffer.toString('utf-8').slice(0, 10000)
+    }
+  } catch (err) {
+    console.error(`[Email] Failed to extract text from ${filename}:`, err.message)
+  }
+  return null
+}
+
 export function createEmailPoller(vaultDir, configPath) {
   const statePath = path.join(vaultDir, '.vault-email-state.json')
   let interval = null
@@ -140,6 +209,41 @@ export function createEmailPoller(vaultDir, configPath) {
     }
   }
 
+  function ensureAttachmentsDir() {
+    const dir = path.join(vaultDir, 'attachments')
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+    return dir
+  }
+
+  async function saveAttachments(attachments, slug) {
+    if (!attachments?.length) return { savedFiles: [], extractedTexts: [] }
+    const attDir = ensureAttachmentsDir()
+    const savedFiles = []
+    const extractedTexts = []
+
+    for (const att of attachments) {
+      const filename = att.filename || `attachment-${Date.now().toString(36)}`
+      const safeName = `${slug}-${filename}`.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120)
+      const filePath = path.join(attDir, safeName)
+
+      try {
+        fs.writeFileSync(filePath, att.content)
+        savedFiles.push({ name: filename, path: `attachments/${safeName}`, size: att.size || att.content.length, type: att.contentType })
+        console.log(`[Email] Saved attachment: ${safeName} (${att.contentType})`)
+
+        const extracted = await extractAttachmentText(att.content, filename)
+        if (extracted?.trim()) {
+          extractedTexts.push({ name: filename, text: extracted.slice(0, 8000) })
+          console.log(`[Email] Extracted ${extracted.length} chars from ${filename}`)
+        }
+      } catch (err) {
+        console.error(`[Email] Failed to save attachment ${filename}:`, err.message)
+      }
+    }
+
+    return { savedFiles, extractedTexts }
+  }
+
   async function processEmail(parsed, apiKey, model) {
     const subject = parsed.subject || 'No Subject'
     const from = parsed.from?.text || ''
@@ -150,15 +254,32 @@ export function createEmailPoller(vaultDir, configPath) {
     const body = parsed.text || parsed.html?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') || ''
     const meta = { from, to, cc, date, subject, messageId }
 
-    if (!body.trim() || body.trim().length < 20) {
-      return { skip: true, reason: 'Empty or too short' }
+    const slug = subject.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
+    const { savedFiles, extractedTexts } = await saveAttachments(parsed.attachments, slug)
+    meta.attachments = savedFiles
+
+    const hasBody = body.trim() && body.trim().length >= 20
+    const hasAttachmentText = extractedTexts.length > 0
+
+    if (!hasBody && !hasAttachmentText) {
+      return { skip: true, reason: 'Empty or too short (no extractable content)' }
+    }
+
+    let fullContent = body
+    if (extractedTexts.length > 0) {
+      const attSection = extractedTexts.map(a => `\n--- Attachment: ${a.name} ---\n${a.text}`).join('\n')
+      fullContent = `${body}\n\n## ATTACHMENT CONTENTS\n${attSection}`
     }
 
     if (!apiKey) {
-      return saveRawEmail(meta, body)
+      return saveRawEmail(meta, fullContent)
     }
 
     try {
+      const attachmentInfo = savedFiles.length > 0
+        ? `\n\nAttachments: ${savedFiles.map(f => `${f.name} (${f.type})`).join(', ')}`
+        : ''
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -178,6 +299,7 @@ Rules:
   NEVER use generic tags: reference, document, email, note, summary, import, general, misc
 - Content: structured markdown with clear headings
 - If the email contains action items, list them under "## Action Items"
+- If there are attachments, incorporate their content into the note and list them under "## Attachments" with their filenames
 - If there is no real knowledge (OTP codes, spam, marketing, automated notifications), return {"skip": true, "reason": "..."}
 - Ignore email signatures, legal disclaimers, and quoted reply chains
 
@@ -186,29 +308,35 @@ Return ONLY valid JSON:
 or { "skip": true, "reason": "..." }`,
           messages: [{
             role: 'user',
-            content: `From: ${from}\nTo: ${to}\nCC: ${cc}\nDate: ${date}\nSubject: ${subject}\n\n${body.slice(0, 6000)}`
+            content: `From: ${from}\nTo: ${to}\nCC: ${cc}\nDate: ${date}\nSubject: ${subject}${attachmentInfo}\n\n${fullContent.slice(0, 12000)}`
           }]
         })
       })
 
       if (!response.ok) {
         console.error(`[Email] AI error ${response.status}`)
-        return saveRawEmail(meta, body)
+        return saveRawEmail(meta, fullContent)
       }
 
       const data = await response.json()
       const text = data.content?.[0]?.text || ''
       const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) return saveRawEmail(meta, body)
+      if (!jsonMatch) return saveRawEmail(meta, fullContent)
 
       const result = JSON.parse(jsonMatch[0])
       if (result.skip) return { skip: true, reason: result.reason || 'AI skipped' }
 
-      return saveNote(result.title || subject, result.tags || [], result.content || body, meta)
+      return saveNote(result.title || subject, result.tags || [], result.content || fullContent, meta)
     } catch (err) {
       console.error('[Email] AI processing failed:', err.message)
-      return saveRawEmail(meta, body)
+      return saveRawEmail(meta, fullContent)
     }
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   function yamlEscape(s) {
@@ -249,7 +377,13 @@ or { "skip": true, "reason": "..." }`,
       meta.subject ? `> **Subject:** ${meta.subject}` : null
     ].filter(Boolean).join('\n')
 
-    const fullContent = `${frontmatter}\n\n${emailHeader}\n\n---\n\n${content}\n`
+    let attachmentSection = ''
+    if (meta.attachments?.length) {
+      const links = meta.attachments.map(a => `- [${a.name}](${a.path}) *(${a.type}, ${formatSize(a.size)})*`)
+      attachmentSection = `\n\n## Attachments\n\n${links.join('\n')}\n`
+    }
+
+    const fullContent = `${frontmatter}\n\n${emailHeader}\n\n---\n\n${content}${attachmentSection}\n`
     fs.writeFileSync(path.join(vaultDir, filename), fullContent, 'utf-8')
     return { skip: false, filename }
   }
