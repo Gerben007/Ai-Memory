@@ -18,6 +18,9 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      # Remote MCP bearer token (required for /mcp endpoint). Leave unset to
+      # disable; /mcp will return 503.
+      - MCP_BEARER_TOKEN=${MCP_BEARER_TOKEN:-}
 
   # Cloudflare Tunnel — exposes vault externally via your domain
   # To set up:

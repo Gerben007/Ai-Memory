@@ -6,6 +6,7 @@ import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
+import { createMcpRoutes } from './mcpRoutes.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -115,6 +116,12 @@ app.use('/api', createSearchRoutes(VAULT_DIR))
 if (createImportRoutes) {
   app.use('/api/import', createImportRoutes(VAULT_DIR))
 }
+
+// Remote MCP endpoint (Streamable HTTP, bearer-guarded).
+app.use('/mcp', createMcpRoutes({
+  vaultBaseUrl: `http://127.0.0.1:${PORT}`,
+  bearerToken: process.env.MCP_BEARER_TOKEN || ''
+}))
 
 // In production, serve the built frontend
 if (process.env.NODE_ENV === 'production') {

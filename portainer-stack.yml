@@ -33,3 +33,7 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      # Remote MCP bearer token — required for Claude mobile / claude.ai custom
+      # connector at https://vault.stratusfinance.co.za/mcp. Leave unset to
+      # disable the /mcp endpoint (it will return 503).
+      - MCP_BEARER_TOKEN=${MCP_BEARER_TOKEN:-}
