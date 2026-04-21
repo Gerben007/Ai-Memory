@@ -6,6 +6,7 @@ import fs from 'fs'
 import { createFileRoutes } from './fileRoutes.js'
 import { createAnthropicProxy } from './anthropicProxy.js'
 import { createSearchRoutes } from './searchRoutes.js'
+import { createAuthMiddleware, authStatusHandler } from './authMiddleware.js'
 // Import routes loaded dynamically — native deps (pdf-parse) may crash on some CPUs
 let createImportRoutes = null
 try {
@@ -28,9 +29,31 @@ if (!fs.existsSync(VAULT_DIR)) {
   fs.mkdirSync(VAULT_DIR, { recursive: true })
 }
 
-app.use(cors())
+// CORS: default to same-origin only. Additional origins (e.g. for the web
+// clipper bookmarklet on arbitrary sites) can be allow-listed via env var.
+// Auth is enforced on /api/*, so relaxing CORS does not grant vault access on
+// its own — a malicious site still can't read the bearer token from another
+// origin's localStorage.
+const allowedOrigins = (process.env.VAULT_ALLOWED_ORIGINS || '')
+  .split(',').map(s => s.trim()).filter(Boolean)
+const allowAllOrigins = allowedOrigins.includes('*')
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(null, true) // same-origin / server-to-server
+    if (allowAllOrigins) return cb(null, true)
+    if (allowedOrigins.includes(origin)) return cb(null, true)
+    return cb(null, false)
+  },
+  credentials: false
+}))
 app.use(express.json())
 app.use(express.text())
+
+// Auth-status is public so the frontend can discover whether a token is needed.
+app.get('/api/auth/status', authStatusHandler)
+
+// Everything else under /api requires a valid bearer token when VAULT_AUTH_TOKEN is set.
+app.use('/api', createAuthMiddleware())
 
 // Config endpoints — persists settings in the vault directory (survives Docker rebuilds)
 app.get('/api/config', (req, res) => {

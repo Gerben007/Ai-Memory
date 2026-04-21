@@ -8,6 +8,7 @@ import AgentPanel from './components/AgentPanel'
 import Settings from './components/Settings'
 import SearchOverlay from './components/SearchOverlay'
 import KnowledgePulse from './components/KnowledgePulse'
+import AuthGate from './components/AuthGate'
 
 // SVG icon components
 const Icons = {
@@ -276,6 +277,9 @@ export default function App() {
 
       {/* ── Search overlay ──────────────────────────────────────── */}
       {showSearch && <SearchOverlay onClose={() => setShowSearch(false)} />}
+
+      {/* ── Auth gate (shown when the server requires a token) ──── */}
+      <AuthGate onUnlock={() => { loadNotes(); loadConfig(); loadContext() }} />
     </div>
   )
 }

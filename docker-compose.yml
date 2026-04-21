@@ -12,6 +12,10 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - VAULT_DIR=/data/vault
+      # Required for any non-localhost deployment. Set in .env to enable
+      # bearer-token auth on every /api endpoint.
+      - VAULT_AUTH_TOKEN=${VAULT_AUTH_TOKEN:-}
+      - VAULT_ALLOWED_ORIGINS=${VAULT_ALLOWED_ORIGINS:-}
 
   # Cloudflare Tunnel — exposes vault externally via your domain
   # To set up:

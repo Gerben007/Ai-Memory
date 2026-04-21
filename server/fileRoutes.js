@@ -6,9 +6,14 @@ export function createFileRoutes(vaultDir) {
   const router = Router()
 
   function sanitizeFilename(filename) {
+    if (typeof filename !== 'string' || !filename) return null
     if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return null
     }
+    // Block dotfiles — the vault dir also holds `.vault-config.json`,
+    // `.vault-context.md`, and `.uploads/`, which must not be reachable
+    // via the public notes API.
+    if (filename.startsWith('.')) return null
     if (!filename.endsWith('.md')) {
       filename += '.md'
     }
@@ -19,7 +24,7 @@ export function createFileRoutes(vaultDir) {
   router.get('/', async (req, res) => {
     try {
       const files = await fs.readdir(vaultDir)
-      const mdFiles = files.filter(f => f.endsWith('.md'))
+      const mdFiles = files.filter(f => f.endsWith('.md') && !f.startsWith('.'))
 
       const notes = await Promise.all(
         mdFiles.map(async (filename) => {

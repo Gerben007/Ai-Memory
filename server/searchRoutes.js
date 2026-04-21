@@ -226,7 +226,8 @@ let lastBuildTime = 0
 
 async function rebuildIndex(vaultDir) {
   const files = await fs.readdir(vaultDir)
-  const mdFiles = files.filter(f => f.endsWith('.md'))
+  // Skip dotfiles (.vault-context.md etc.) — those aren't regular notes.
+  const mdFiles = files.filter(f => f.endsWith('.md') && !f.startsWith('.'))
 
   allNotes = []
   allChunks = []

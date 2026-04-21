@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useStore } from '../lib/store'
 import { renderMarkdown } from '../lib/markdownParser'
+import { authHeader } from '../lib/api'
 import TagPill from './TagPill'
 
 const ACCEPT = '.pdf,.docx,.xlsx,.xls,.csv,.eml,.txt,.md'
@@ -33,6 +34,7 @@ export default function ImportPanel() {
 
       const uploadRes = await fetch('/api/import', {
         method: 'POST',
+        headers: { ...authHeader() },
         body: formData
       })
 
@@ -57,7 +59,7 @@ export default function ImportPanel() {
 
       const analyzeRes = await fetch('/api/import/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({
           title: extracted.title,
           sections: extracted.sections,

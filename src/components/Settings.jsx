@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { getAllTagsWithCounts } from '../lib/tagUtils'
+import { authHeader, getVaultToken, setVaultToken } from '../lib/api'
 import TagCleanup from './TagCleanup'
 import AgentPanel from './AgentPanel'
 import JSZip from 'jszip'
@@ -24,6 +25,8 @@ export default function Settings() {
   const [confirmClear, setConfirmClear] = useState(false)
   const [showTagCleanup, setShowTagCleanup] = useState(false)
   const [contextStatus, setContextStatus] = useState('')
+  const [tokenInput, setTokenInput] = useState(getVaultToken())
+  const [tokenStatus, setTokenStatus] = useState('')
 
   // Load vault context on mount
   useEffect(() => { loadContext() }, [])
@@ -49,7 +52,8 @@ export default function Settings() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': keyInput
+          'x-api-key': keyInput,
+          ...authHeader()
         },
         body: JSON.stringify({
           model,
@@ -137,6 +141,36 @@ export default function Settings() {
                 {keyStatus}
               </span>
             )}
+          </div>
+        </section>
+
+        {/* Vault Access Token */}
+        <section>
+          <h3 className="text-sm font-semibold text-gray-300 mb-3">Vault Access Token</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Required when the server was started with <code className="font-mono">VAULT_AUTH_TOKEN</code>. Stored in this
+            browser's localStorage and sent as <code className="font-mono">Authorization: Bearer &lt;token&gt;</code> on
+            every request to this vault.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={tokenInput}
+              onChange={e => setTokenInput(e.target.value)}
+              placeholder="vault access token"
+              className="flex-1 bg-gray-800 text-gray-200 text-sm rounded-lg px-4 py-2.5 border border-gray-700 focus:border-indigo-500 focus:outline-none placeholder-gray-500 font-mono"
+            />
+            <button
+              onClick={() => {
+                setVaultToken(tokenInput.trim())
+                setTokenStatus(tokenInput.trim() ? 'Saved' : 'Cleared')
+                setTimeout(() => setTokenStatus(''), 2000)
+              }}
+              className="text-xs bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-500"
+            >
+              Save
+            </button>
+            {tokenStatus && <span className="text-xs py-2 text-green-400">{tokenStatus}</span>}
           </div>
         </section>
 

@@ -19,14 +19,23 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 const VAULT_URL = process.env.VAULT_URL || 'http://localhost:3001'
+const VAULT_AUTH_TOKEN = process.env.VAULT_AUTH_TOKEN || ''
 
 // ── Helpers ─────────────────────────────────────────────────────────────
+
+function authHeaders() {
+  return VAULT_AUTH_TOKEN ? { Authorization: `Bearer ${VAULT_AUTH_TOKEN}` } : {}
+}
 
 async function vaultFetch(path, options = {}) {
   const url = `${VAULT_URL}${path}`
   const res = await fetch(url, {
     ...options,
-    headers: { 'Content-Type': options.body ? 'application/json' : undefined, ...options.headers }
+    headers: {
+      'Content-Type': options.body ? 'application/json' : undefined,
+      ...authHeaders(),
+      ...options.headers
+    }
   })
   if (!res.ok) {
     const err = await res.text().catch(() => res.statusText)
@@ -39,7 +48,7 @@ async function vaultFetchText(path, options = {}) {
   const url = `${VAULT_URL}${path}`
   const res = await fetch(url, {
     ...options,
-    headers: { 'Content-Type': 'text/plain', ...options.headers }
+    headers: { 'Content-Type': 'text/plain', ...authHeaders(), ...options.headers }
   })
   if (!res.ok) {
     const err = await res.text().catch(() => res.statusText)

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useStore } from '../lib/store'
 import { getTitle, getTags, getBody, getAllTagsWithCounts } from '../lib/tagUtils'
-import { chatCompletion } from '../lib/api'
+import { chatCompletion, authHeader } from '../lib/api'
 import { renderMarkdown } from '../lib/markdownParser'
 
 export default function VaultInterview() {
@@ -131,7 +131,7 @@ Format: Short questions, conversational tone. Use the person's actual note title
       // Save to server
       await fetch('/api/context', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeader() },
         body: JSON.stringify({ content: newContext })
       })
 
