@@ -113,14 +113,19 @@ echo "==> Found config at $CFG"
 echo "==> Stopping syncthing to edit config"
 sudo systemctl stop "syncthing@$ST_USER.service"
 
-# Generate a strong GUI admin password
-ADMIN_PW=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)
+# Generate a strong GUI admin password. Use Python's secrets module so we
+# don't have to fight SIGPIPE from tr|head under `set -o pipefail`.
+echo "==> Generating admin password"
+ADMIN_PW=$(python3 -c 'import secrets,string; print("".join(secrets.choice(string.ascii_letters+string.digits) for _ in range(24)))')
+
 # bcrypt hash with htpasswd (apache2-utils) — install if missing
 if ! command -v htpasswd >/dev/null 2>&1; then
+    echo "==> Installing apache2-utils for htpasswd"
     sudo apt-get install -y apache2-utils
 fi
 ADMIN_HASH=$(htpasswd -nbBC 10 gerben "$ADMIN_PW" | cut -d: -f2)
 
+echo "==> Patching config.xml (localhost UI, telemetry off, no relays/discovery)"
 sudo python3 - "$CFG" "$ADMIN_HASH" <<'PY'
 import sys, xml.etree.ElementTree as ET
 cfg_path, admin_hash = sys.argv[1], sys.argv[2]
