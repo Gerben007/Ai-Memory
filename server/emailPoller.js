@@ -3,6 +3,7 @@ import { simpleParser } from 'mailparser'
 import { execFileSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
+import { filterTags } from './tagRules.js'
 
 let _XLSX, _mammoth
 async function loadParser(name) {
@@ -346,7 +347,7 @@ or { "skip": true, "reason": "..." }`,
       const result = JSON.parse(jsonMatch[0])
       if (result.skip) return { skip: true, reason: result.reason || 'AI skipped' }
 
-      return saveNote(result.title || subject, result.tags || [], result.content || fullContent, meta)
+      return saveNote(result.title || subject, filterTags(result.tags), result.content || fullContent, meta)
     } catch (err) {
       console.error('[Email] AI processing failed:', err.message)
       return saveRawEmail(meta, fullContent)
@@ -409,9 +410,11 @@ or { "skip": true, "reason": "..." }`,
   }
 
   function saveRawEmail(meta, body) {
+    // No tags: "email/unprocessed" would be a blocklisted generic bucket and
+    // every AI-skipped message would pile into it. User can triage via TagCleanup.
     return saveNote(
       meta.subject || 'Untitled Email',
-      ['email/unprocessed'],
+      [],
       body.slice(0, 4000),
       meta
     )

@@ -1,5 +1,8 @@
 // Shared tag utilities
 
+import { BLOCKED_TAGS, isGenericTag, filterTags } from '../../server/tagRules.js'
+export { BLOCKED_TAGS, isGenericTag, filterTags }
+
 const TAG_PALETTE = [
   '#818cf8', '#f472b6', '#34d399', '#fbbf24', '#60a5fa',
   '#a78bfa', '#fb923c', '#2dd4bf', '#f87171', '#a3e635'
@@ -146,17 +149,6 @@ export function normalizeTags(tags, vaultTagCounts) {
 }
 
 // Suggest tags for a note based on existing vault tags and note content
-// Tags that are too generic to be useful
-const BLOCKED_TAGS = new Set([
-  'reference', 'document', 'email', 'report', 'note', 'summary', 'overview',
-  'general', 'misc', 'info', 'data', 'content', 'source', 'import', 'file',
-  'attachment', 'text', 'other', 'draft', 'todo', 'important', 'review'
-])
-
-export function isGenericTag(tag) {
-  return BLOCKED_TAGS.has(tag.toLowerCase().trim())
-}
-
 export function suggestTags(noteBody, noteTitle, currentTags, allNotes) {
   const allTagCounts = getAllTagsWithCounts(allNotes)
   const currentSet = new Set(currentTags.map(t => t.toLowerCase().trim()))

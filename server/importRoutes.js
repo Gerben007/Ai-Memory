@@ -2,6 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import fs from 'fs/promises'
 import path from 'path'
+import { filterTags } from './tagRules.js'
 
 function yamlQuote(value) {
   const s = String(value ?? '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
@@ -12,10 +13,6 @@ function yamlQuote(value) {
     .replace(/\n/g, '\\n')
     .replace(/\t/g, '\\t')
   return `"${escaped}"`
-}
-
-function sanitizeTag(tag) {
-  return String(tag ?? '').replace(/[^A-Za-z0-9/_-]/g, '').slice(0, 64)
 }
 
 // Native-heavy deps loaded lazily to avoid SIGILL on older CPUs (Alpine + older Xeon etc.)
@@ -159,10 +156,10 @@ Return ONLY the JSON array, no other text.`
           }
         } catch (parseErr) {
           console.error('[Import] Failed to parse AI response:', aiText.slice(0, 300))
-          // Try to salvage — create a single note from the raw text
+          // Salvage as an untagged note — better than seeding a blocklisted tag.
           notes.push({
             title: `${title} (part ${i + 1})`,
-            tags: ['import'],
+            tags: [],
             content: chunks[i]
           })
         }
@@ -184,8 +181,7 @@ Return ONLY the JSON array, no other text.`
           finalFilename = `${slug}-${Date.now().toString(36)}.md`
         }
 
-        const rawTags = Array.isArray(note.tags) && note.tags.length ? note.tags : ['import']
-        const tags = rawTags.map(sanitizeTag).filter(Boolean)
+        const tags = filterTags(note.tags)
         const content = `---\ntitle: ${yamlQuote(noteTitle)}\ntags: [${tags.join(', ')}]\ncreated: ${now}\nupdated: ${now}\nsource: import\n---\n\n${note.content || ''}\n`
 
         await fs.writeFile(path.join(vaultDir, finalFilename), content, 'utf-8')

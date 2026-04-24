@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
+import { filterTags } from './tagRules.js'
 
 function timingSafeEqualStr(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false
@@ -74,20 +75,31 @@ function buildMcpServer(vaultBaseUrl, extraHeaders = {}) {
 
   server.tool(
     'vault_create_note',
-    'Create a new note in the Knowledge Vault. Provide title and markdown content. Tags are optional.',
+    'Create a new note in the Knowledge Vault. Provide title and markdown content. Tags are optional — prefer reusing existing canonical tags from vault_list_tags over inventing new ones. Generic tags (reference, document, email, note, summary, general, misc, import, etc.) are rejected.',
     {
       title: z.string().describe('Title of the note'),
       content: z.string().describe('Markdown body content (without frontmatter — it will be generated)'),
-      tags: z.array(z.string()).optional().describe('Optional tags for categorization, e.g. ["ai", "notes"]')
+      tags: z.array(z.string()).optional().describe('Optional hierarchical tags (parent/child), e.g. ["finance/vat", "project/ai-memory"]')
     },
     async ({ title, content, tags = [] }) => {
       const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
       const filename = `${slug}.md`
+
+      try {
+        await vaultFetchJson(`/api/notes/${encodeURIComponent(filename)}`)
+        throw new Error(`Note "${filename}" already exists. Use vault_update_note to modify it, or choose a more specific title.`)
+      } catch (err) {
+        if (!/404|not found/i.test(err.message)) throw err
+      }
+
       const now = new Date().toISOString()
-      const tagStr = tags.length > 0 ? `[${tags.join(', ')}]` : '[]'
+      const safeTags = filterTags(tags)
+      const tagStr = safeTags.length > 0 ? `[${safeTags.join(', ')}]` : '[]'
       const fullContent = `---\ntitle: "${title}"\ntags: ${tagStr}\ncreated: ${now}\nupdated: ${now}\n---\n\n${content}`
       await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: fullContent })
-      return { content: [{ type: 'text', text: `Created note: ${filename}\nTitle: ${title}\nTags: ${tags.join(', ') || 'none'}` }] }
+      const droppedCount = tags.length - safeTags.length
+      const droppedNote = droppedCount > 0 ? `\n(${droppedCount} tag${droppedCount > 1 ? 's' : ''} dropped — blocked as too generic)` : ''
+      return { content: [{ type: 'text', text: `Created note: ${filename}\nTitle: ${title}\nTags: ${safeTags.join(', ') || 'none'}${droppedNote}` }] }
     }
   )
 
@@ -201,6 +213,30 @@ function buildMcpServer(vaultBaseUrl, extraHeaders = {}) {
         await vaultFetchText(`/api/notes/${encodeURIComponent(filename)}`, { method: 'POST', body: content })
         return { content: [{ type: 'text', text: `Created new daily note for ${slug}` }] }
       }
+    }
+  )
+
+  server.tool(
+    'vault_list_tags',
+    'List all tags currently used in the vault with usage counts, sorted by frequency. Use this before vault_create_note to reuse canonical tag names instead of creating orphans.',
+    {},
+    async () => {
+      const notes = await vaultFetchJson('/api/notes')
+      const counts = new Map()
+      for (const n of notes) {
+        const fm = n.content.match(/^---\n([\s\S]*?)\n---/)
+        if (!fm) continue
+        const tagsMatch = fm[1].match(/tags:\s*\[([^\]]*)\]/)
+        if (!tagsMatch) continue
+        for (const raw of tagsMatch[1].split(',')) {
+          const tag = raw.trim().replace(/^["']|["']$/g, '')
+          if (tag) counts.set(tag, (counts.get(tag) || 0) + 1)
+        }
+      }
+      if (counts.size === 0) return { content: [{ type: 'text', text: 'No tags in vault yet.' }] }
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1])
+      const lines = sorted.map(([tag, n]) => `- ${tag} (${n})`)
+      return { content: [{ type: 'text', text: `Vault tags (${counts.size} unique, sorted by usage):\n\n${lines.join('\n')}` }] }
     }
   )
 

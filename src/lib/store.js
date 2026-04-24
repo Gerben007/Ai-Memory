@@ -3,7 +3,7 @@ import matter from 'gray-matter'
 import * as api from './api'
 import { chunkAllNotes } from './chunker'
 import { BM25Index } from './bm25'
-import { getTags, getAllTagsWithCounts, normalizeTags } from './tagUtils'
+import { getTags, getAllTagsWithCounts, normalizeTags, isGenericTag } from './tagUtils'
 
 const CHAT_STORAGE_KEY = 'kv-chat-messages'
 const API_KEY_STORAGE_KEY = 'kv-anthropic-key'
@@ -119,7 +119,9 @@ export const useStore = create((set, get) => ({
       const currentTags = getTags(note)
       if (currentTags.length === 0) continue
 
-      const normalized = normalizeTags(currentTags, tagCounts)
+      // Drop generic/blocked tags first so normalization only touches real tags.
+      const despammed = currentTags.filter(t => !isGenericTag(t))
+      const normalized = normalizeTags(despammed, tagCounts)
 
       // Check if anything changed
       if (currentTags.length === normalized.length && currentTags.every((t, i) => t === normalized[i])) continue
